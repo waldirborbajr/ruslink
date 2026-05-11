@@ -19,6 +19,25 @@ impl GitRepository {
         }
     }
 
+    /// Verifica se o Git está instalado no sistema
+    pub fn ensure_git_installed() -> Result<()> {
+        debug!("Checking if git is installed...");
+
+        let output = Command::new("git")
+            .arg("--version")
+            .output();
+
+        match output {
+            Ok(o) if o.status.success() => {
+                debug!("Git found: {}", String::from_utf8_lossy(&o.stdout).trim());
+                Ok(())
+            }
+            _ => {
+                anyhow::bail!("Git is not installed or not found in PATH. Please install Git first.")
+            }
+        }
+    }
+
     pub fn is_git_repo(&self) -> bool {
         self.path.join(".git").exists()
     }
