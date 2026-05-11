@@ -10,7 +10,7 @@ use anyhow::Result;
 use tracing::{debug, info, warn};
 
 use args::parse_args;
-use git::GitRepository;           // ← Import atualizado
+use git::GitRepository;
 use ignore::load_all_ignore_patterns;
 use output::{success, error, warning};
 use stow::{stow_package, unstow_package};
@@ -53,8 +53,7 @@ fn main() -> Result<()> {
 
     // Git Operations
     if !config.dry_run && !config.delete {
-        let repo = GitRepository::new(&package_path);
-        handle_git_operations(&repo, &config)?;
+        handle_git_operations(&package_path, &config)?;
     }
 
     if config.dry_run {
@@ -66,7 +65,16 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn handle_git_operations(repo: &GitRepository, config: &config::Config) -> Result<()> {
+/// Gerencia todas as operações relacionadas ao Git
+fn handle_git_operations(package_path: &std::path::Path, config: &config::Config) -> Result<()> {
+    // Verifica se Git está instalado antes de qualquer operação
+    if let Err(e) = GitRepository::ensure_git_installed() {
+        error(&format!("Git error: {}", e));
+        std::process::exit(1);
+    }
+
+    let repo = GitRepository::new(package_path);
+
     if config.auto_git {
         info!("Git: Checking for changes...");
         
