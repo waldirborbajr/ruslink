@@ -63,6 +63,10 @@ struct Args {
     /// Custom commit message
     #[arg(short = 'm', long)]
     message: Option<String>,
+
+    /// Automatically answer yes to all prompts (skip confirmation)
+    #[arg(short = 'y', long = "yes")]
+    yes: bool,
 }
 
 pub fn parse_args() -> Config {
@@ -88,5 +92,6 @@ pub fn parse_args() -> Config {
         backup: args.backup,
         adopt: args.adopt,
         commit_message: args.message,
+        yes: args.yes,          // ← Novo campo
     }
 }
