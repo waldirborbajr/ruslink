@@ -24,4 +24,7 @@ pub struct Config {
     pub force: bool,
     pub backup: bool,
     pub adopt: bool,
+
+    // Confirmation
+    pub yes: bool,          // ← Novo campo
 }
