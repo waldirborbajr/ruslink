@@ -4,6 +4,8 @@ use std::io::{self, Write};
 use crate::config::Config;
 use crate::output::{warning, error};
 
+use tracing::debug;
+
 /// Solicita confirmação do usuário para ações destrutivas
 pub fn confirm_action(action: &str, config: &Config) -> bool {
     if config.yes {
