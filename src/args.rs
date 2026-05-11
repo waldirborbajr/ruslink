@@ -1,77 +1,77 @@
+// src/args.rs
 use clap::Parser;
 use std::path::PathBuf;
 
 use crate::config::Config;
 
 #[derive(Parser, Debug)]
+#[command(author, version, about)]
 #[command(name = "ruslink")]
-#[command(about = "Rust Stow with .gitignore + Auto Git Commit", long_about = None)]
-#[command(version)]
+#[command(after_help = "Examples:
+  ruslink nvim
+  ruslink nvim --git --message \"Update neovim\"
+  ruslink nvim --restow --force
+  ruslink nvim --dry-run -v")]
 struct Args {
-    /// Package to stow
+    /// Package name to manage
     package: String,
 
-    /// Stow directory
-    #[arg(short, long)]
+    /// Stow directory (default: current directory)
+    #[arg(short = 'd', long)]
     dir: Option<PathBuf>,
 
-    /// Target directory
-    #[arg(short, long)]
+    /// Target directory (default: parent of stow dir)
+    #[arg(short = 't', long)]
     target: Option<PathBuf>,
 
-    /// Unstow only
+    /// Delete/unstow only
     #[arg(short = 'D', long)]
     delete: bool,
 
-    /// Unstow then stow
+    /// Restow (unstow then stow)
     #[arg(short = 'R', long)]
     restow: bool,
 
-    /// Simulate only
-    #[arg(short = 'n', long = "dry-run")]
+    /// Dry run (simulate only)
+    #[arg(short = 'n', long)]
     dry_run: bool,
 
     /// Verbose output
     #[arg(short, long)]
     verbose: bool,
 
-    /// Auto commit changes to git
+    /// Enable git integration (commit changes)
     #[arg(short, long)]
     git: bool,
 
-    /// Push changes to git remote after commit
+    /// Push to remote after commit
     #[arg(long)]
     git_push: bool,
 
-    /// Overwrite existing destination files if present
+    /// Force overwrite existing files
     #[arg(long)]
     force: bool,
 
-    /// Backup existing files before modifying them
+    /// Create backup before overwriting
     #[arg(long)]
     backup: bool,
 
-    /// Adopt existing files (replace with symlink, no backup)
+    /// Adopt existing files (replace with symlink)
     #[arg(long)]
     adopt: bool,
 
     /// Custom commit message
-    #[arg(short, long)]
+    #[arg(short = 'm', long)]
     message: Option<String>,
 }
 
 pub fn parse_args() -> Config {
     let args = Args::parse();
 
-    let mut stow_dir = args
-        .dir
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let stow_dir = args.dir.unwrap_or_else(|| std::env::current_dir().expect("Failed to get current dir"));
 
-    let mut target_dir = args.target.unwrap_or_else(|| {
-        stow_dir
-            .parent()
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| std::path::PathBuf::from("/"))
+    let target_dir = args.target.unwrap_or_else(|| {
+        stow_dir.parent().map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/"))
     });
 
     Config {
