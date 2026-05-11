@@ -1,142 +1,152 @@
 // src/git.rs
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use anyhow::Result;
 use tracing::{debug, info, warn};
 
 use crate::config::Config;
 
-/// Check if there are uncommitted changes in the git repository
-pub fn has_git_changes(package_path: &Path) -> Result<bool> {
-    if !package_path.join(".git").exists() {
-        return Ok(false);
-    }
-
-    let output = Command::new("git")
-        .arg("status")
-        .arg("--porcelain")
-        .current_dir(package_path)
-        .output()?;
-
-    Ok(!output.stdout.is_empty())
+/// Representa um repositório Git gerenciado pelo ruslink
+#[derive(Debug)]
+pub struct GitRepository {
+    path: PathBuf,
 }
 
-/// Silent auto-commit (used when --git is not explicitly passed)
-pub fn auto_git_commit_silent(package_path: &Path, package_name: &str) -> Result<()> {
-    if !package_path.join(".git").exists() {
-        debug!("Not a git repository. Skipping auto-commit.");
-        return Ok(());
+impl GitRepository {
+    pub fn new<P: AsRef<Path>>(package_path: P) -> Self {
+        Self {
+            path: package_path.as_ref().to_path_buf(),
+        }
     }
 
-    debug!("Auto-committing changes for package: {}", package_name);
-
-    // Add changes
-    let add_status = Command::new("git")
-        .arg("add")
-        .arg(".")
-        .current_dir(package_path)
-        .status()?;
-
-    if !add_status.success() {
-        anyhow::bail!("git add failed");
+    pub fn is_git_repo(&self) -> bool {
+        self.path.join(".git").exists()
     }
 
-    // Check if there are actually changes to commit
-    let diff_status = Command::new("git")
-        .arg("diff")
-        .arg("--cached")
-        .arg("--quiet")
-        .current_dir(package_path)
-        .status()?;
+    pub fn has_changes(&self) -> Result<bool> {
+        if !self.is_git_repo() {
+            return Ok(false);
+        }
 
-    if diff_status.success() {
-        debug!("No changes to commit after git add.");
-        return Ok(());
+        let output = self.git_command()
+            .arg("status")
+            .arg("--porcelain")
+            .output()?;
+
+        Ok(!output.stdout.is_empty())
     }
 
-    let message = format!(
-        "chore({}): auto-update configuration ({})",
-        package_name,
-        chrono::Local::now().format("%Y-%m-%d %H:%M")
-    );
+    /// Commit silencioso automático
+    pub fn auto_commit_silent(&self, package_name: &str) -> Result<()> {
+        if !self.is_git_repo() {
+            debug!("Not a git repository. Skipping auto-commit.");
+            return Ok(());
+        }
 
-    let commit_status = Command::new("git")
-        .arg("commit")
-        .arg("-m")
-        .arg(&message)
-        .current_dir(package_path)
-        .status()?;
+        debug!("Auto-committing changes for package: {}", package_name);
 
-    if commit_status.success() {
-        info!("✓ Auto-commit successful: {}", message);
-    } else {
-        debug!("Commit returned non-zero (possibly empty).");
-    }
+        self.git_add()?;
+        
+        if self.has_staged_changes()? {
+            debug!("No changes to commit after git add.");
+            return Ok(());
+        }
 
-    Ok(())
-}
-
-/// Manual git commit (used with --git flag)
-pub fn auto_git_commit(package_path: &Path, config: &Config) -> Result<()> {
-    if !package_path.join(".git").exists() {
-        debug!("Not a git repository.");
-        return Ok(());
-    }
-
-    if !has_git_changes(package_path)? {
-        info!("No changes to commit.");
-        return Ok(());
-    }
-
-    // git add
-    Command::new("git")
-        .arg("add")
-        .arg(".")
-        .current_dir(package_path)
-        .status()?;
-
-    let message = config.commit_message.clone().unwrap_or_else(|| {
-        format!("Update {} configuration - {}", 
-            config.package, 
+        let message = format!(
+            "chore({}): auto-update configuration ({})",
+            package_name,
             chrono::Local::now().format("%Y-%m-%d %H:%M")
-        )
-    });
+        );
 
-    let status = Command::new("git")
-        .arg("commit")
-        .arg("-m")
-        .arg(&message)
-        .current_dir(package_path)
-        .status()?;
+        self.git_commit(&message)?;
+        Ok(())
+    }
 
-    if status.success() {
+    /// Commit com mensagem configurável (usado com --git)
+    pub fn commit(&self, config: &Config) -> Result<()> {
+        if !self.is_git_repo() {
+            debug!("Not a git repository.");
+            return Ok(());
+        }
+
+        if !self.has_changes()? {
+            info!("No changes to commit.");
+            return Ok(());
+        }
+
+        self.git_add()?;
+
+        let message = config.commit_message.clone().unwrap_or_else(|| {
+            format!(
+                "Update {} configuration - {}",
+                config.package,
+                chrono::Local::now().format("%Y-%m-%d %H:%M")
+            )
+        });
+
+        self.git_commit(&message)?;
         info!("✓ Changes committed successfully!");
-    } else {
-        warn!("Commit failed or no changes were staged.");
+        Ok(())
     }
 
-    Ok(())
-}
+    /// Push para o remote
+    pub fn push(&self) -> Result<()> {
+        if !self.is_git_repo() {
+            debug!("Not a git repository. Skipping push.");
+            return Ok(());
+        }
 
-/// Push changes to remote
-pub fn auto_git_push(package_path: &Path, _config: &Config) -> Result<()> {
-    if !package_path.join(".git").exists() {
-        debug!("Not a git repository. Skipping push.");
-        return Ok(());
+        info!("Pushing changes to remote...");
+
+        let status = self.git_command().arg("push").status()?;
+
+        if status.success() {
+            info!("✓ Successfully pushed to remote!");
+        } else {
+            anyhow::bail!("git push failed");
+        }
+
+        Ok(())
     }
 
-    info!("Pushing changes to remote...");
+    // ====================== Helpers ======================
 
-    let status = Command::new("git")
-        .arg("push")
-        .current_dir(package_path)
-        .status()?;
-
-    if status.success() {
-        info!("✓ Successfully pushed to remote!");
-    } else {
-        anyhow::bail!("git push failed");
+    /// Retorna um Command já configurado com o diretório correto
+    fn git_command(&self) -> Command {
+        let mut cmd = Command::new("git");
+        cmd.current_dir(&self.path);
+        cmd
     }
 
-    Ok(())
+    fn git_add(&self) -> Result<()> {
+        let status = self.git_command().arg("add").arg(".").status()?;
+
+        if !status.success() {
+            anyhow::bail!("git add failed");
+        }
+        Ok(())
+    }
+
+    fn has_staged_changes(&self) -> Result<bool> {
+        let status = self.git_command()
+            .arg("diff")
+            .arg("--cached")
+            .arg("--quiet")
+            .status()?;
+
+        Ok(status.success()) // success significa "não há diferenças"
+    }
+
+    fn git_commit(&self, message: &str) -> Result<()> {
+        let status = self.git_command()
+            .arg("commit")
+            .arg("-m")
+            .arg(message)
+            .status()?;
+
+        if !status.success() {
+            debug!("Commit returned non-zero (possibly no changes).");
+        }
+        Ok(())
+    }
 }
