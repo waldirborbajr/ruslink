@@ -23,6 +23,16 @@ Build with Cargo:
 cargo build --release
 ```
 
+Build with just
+
+```bash
+just build                  # build normal (git + colors)
+just build-minimal          # build bem leve
+just build-release-minimal  # release mínimo
+just build-no-git
+just size                   # ver tamanho do binário
+```
+
 The binary will be available at `target/release/ruslink`.
 
 ## Usage
