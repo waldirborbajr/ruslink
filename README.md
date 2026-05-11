@@ -75,4 +75,5 @@ The ignore loader also skips common metadata files such as `.git`, `.gitmodules`
 
 ## License
 
-This project does not include a license file by default.
+This project is released under the MIT License - see the [LICENSE](LICENSE) file for details.
+
