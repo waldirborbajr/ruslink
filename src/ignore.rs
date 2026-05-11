@@ -6,14 +6,14 @@ pub fn load_all_ignore_patterns(package_path: &Path) -> Vec<regex::Regex> {
     let mut regexes = Vec::new();
 
     for pat in [
-        r"^\.git$", r"^\.gitmodules$", r"^\.gitignore$", r"^\.rustow\.ignore$",
+        r"^\.git$", r"^\.gitmodules$", r"^\.gitignore$", r"^\.ruslink\.ignore$",
         r"^README.*$", r"^LICENSE.*$", r"^COPYING.*$", r".*\.bak$", r".*\.tmp$", r"^\.DS_Store$",
     ] {
         if let Ok(re) = regex::Regex::new(pat) { regexes.push(re); }
     }
 
     if let Some(git) = load_gitignore(package_path) { regexes.extend(git); }
-    if let Some(rustow) = load_rustow_ignore(package_path) { regexes.extend(rustow); }
+    if let Some(ruslink) = load_ruslink_ignore(package_path) { regexes.extend(ruslink); }
 
     regexes
 }
@@ -35,8 +35,8 @@ pub fn load_gitignore(base: &Path) -> Option<Vec<regex::Regex>> {
     Some(regexes)
 }
 
-pub fn load_rustow_ignore(base: &Path) -> Option<Vec<regex::Regex>> {
-    let path = base.join(".rustow.ignore");
+pub fn load_ruslink_ignore(base: &Path) -> Option<Vec<regex::Regex>> {
+    let path = base.join(".ruslink.ignore");
     if !path.exists() { return None; }
     
     let mut regexes = Vec::new();
