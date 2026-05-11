@@ -1,16 +1,19 @@
 # ruslink
 
-`ruslink` is a lightweight Rust-based stow utility for managing dotfiles and package-style deployments with support for ignore patterns, dry-run mode, auto git commit, force overwrite, and backup.
+`ruslink` is a lightweight Rust-based stow utility for managing dotfiles and package-style deployments with support for ignore patterns, dry-run mode, auto git commit, force overwrite, backup, and friendly error messages.
 
 ## Features
 
 - Stows a package directory into a target location using symlinks
 - Supports uninstalling packages and restowing
 - Respects `.gitignore` and `.ruslink.ignore` patterns
-- Auto commit changes in a git repository
+- Auto commit changes in a git repository with optional push
 - Force overwrite existing destination files
 - Backup existing files before overwriting/removing them
+- Adopt mode to replace existing files with symlinks
 - Dry-run mode for safe previews
+- Structured logging with tracing (use `-v` flag for debug logs)
+- Human-friendly error messages on crashes
 
 ## Installation
 
@@ -43,13 +46,31 @@ This command will stow the `home` package from `~/.dotfiles/home` into the home 
 - `-D, --delete`: Only unstow the package
 - `-R, --restow`: Unstow then stow the package
 - `-n, --dry-run`: Simulate actions without making changes
-- `-v, --verbose`: Enable verbose output
+- `-v, --verbose`: Enable verbose (debug) output with structured logging
 - `-g, --git`: Auto commit changes in the package git repository
 - `--git-push`: Push changes to git remote after commit
 - `--force`: Overwrite existing destination files
 - `--backup`: Backup existing files before modifying them
 - `--adopt`: Adopt existing files (replace with symlink, no backup)
 - `-m, --message <MSG>`: Custom git commit message
+
+## Logging
+
+Use the `-v` or `--verbose` flag to enable debug logging:
+
+```bash
+ruslink home --dir ~/.dotfiles --target ~ -v
+```
+
+This will show detailed information about what ruslink is doing internally, including:
+- Configuration details
+- Symlink creation operations
+- File adoption/backup operations
+- Git operations
+
+## Error Handling
+
+`ruslink` provides human-friendly error messages on crashes and panics. If something goes wrong, you'll see a clear, actionable error message instead of a cryptic panic traceback.
 
 ## Ignore files
 

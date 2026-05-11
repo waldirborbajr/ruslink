@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use anyhow::Result;
+use tracing::{debug, info};
 
 use crate::config::Config;
 use crate::ignore::should_ignore;
@@ -12,10 +13,7 @@ pub fn stow_package(
     ignores: &[regex::Regex],
 ) -> Result<()> {
     if !source.is_dir() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "source package must be a directory",
-        ));
+        anyhow::bail!("source package must be a directory");
     }
 
     visit_source(source, source, target, config, ignores)
@@ -70,24 +68,28 @@ fn stow_item(source: &Path, destination: &Path, config: &Config) -> Result<()> {
     if destination.exists() || destination.symlink_metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) {
         if config.adopt {
             // Adopt mode: replace without backup
+            debug!("Adopting existing file: {:?}", destination);
             remove_existing(destination)?;
         } else if config.force {
             // Force mode: replace with optional backup
             if config.backup {
+                debug!("Backing up existing file: {:?}", destination);
                 backup_existing(destination)?;
             }
+            debug!("Force removing existing file: {:?}", destination);
             remove_existing(destination)?;
         } else {
-            eprintln!("Skipping existing destination: {:?}", destination);
+            debug!("Skipping existing destination: {:?}", destination);
             return Ok(());
         }
     }
 
     if config.dry_run {
-        println!("DRY RUN: link {:?} -> {:?}", destination, source);
+        debug!("DRY RUN: would link {:?} -> {:?}", destination, source);
         return Ok(());
     }
 
+    debug!("Creating symlink: {:?} -> {:?}", destination, source);
     create_symlink(source, destination)
 }
 
