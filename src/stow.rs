@@ -10,7 +10,7 @@ use tracing::{debug, info};
 use crate::config::Config;
 use crate::ignore::should_ignore;
 
-/// Resultado das operações de stow/unstow com métricas
+/// Estatísticas de execução das operações de stow/unstow
 #[derive(Debug, Default)]
 pub struct StowStats {
     pub files_linked: usize,
@@ -28,7 +28,7 @@ impl StowStats {
     }
 }
 
-// ====================== STOW ======================
+// ====================== PUBLIC API ======================
 
 pub fn stow_package(
     source: &Path,
@@ -52,8 +52,6 @@ pub fn stow_package(
     Ok(stats)
 }
 
-// ====================== UNSTOW ======================
-
 pub fn unstow_package(
     source: &Path,
     target: &Path,
@@ -76,7 +74,7 @@ pub fn unstow_package(
     Ok(stats)
 }
 
-// ====================== VISITORS ======================
+// ====================== STOW ======================
 
 fn visit_source(
     root: &Path,
@@ -121,6 +119,7 @@ fn stow_item(source: &Path, destination: &Path, config: &Config) -> Result<bool>
         }
     }
 
+    // Handle existing destination
     if destination.exists() || destination.symlink_metadata().is_ok() {
         handle_existing_destination(destination, config)?;
     }
@@ -177,4 +176,86 @@ fn visit_unstow(
         }
     }
     Ok(())
+}
+
+// ====================== HELPERS ======================
+
+fn handle_existing_destination(destination: &Path, config: &Config) -> Result<()> {
+    if destination.symlink_metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) {
+        if !config.dry_run {
+            fs::remove_file(destination)?;
+        }
+        return Ok(());
+    }
+
+    // Real file or directory exists
+    if config.adopt {
+        debug!("Adopting existing file: {:?}", destination);
+        remove_existing(destination)?;
+    } else if config.force {
+        if config.backup {
+            backup_existing(destination)?;
+        }
+        remove_existing(destination)?;
+    } else {
+        anyhow::bail!("Conflict: {:?} already exists (use --force or --adopt)", destination);
+    }
+    Ok(())
+}
+
+fn make_relative(source: &Path, destination: &Path) -> PathBuf {
+    diff_paths(source, destination.parent().unwrap_or(destination))
+        .unwrap_or_else(|| source.to_path_buf())
+}
+
+fn backup_existing(path: &Path) -> Result<()> {
+    let mut backup = path.with_extension("bak");
+    let mut counter = 1;
+    while backup.exists() {
+        backup = path.with_extension(format!("bak{}", counter));
+        counter += 1;
+    }
+    fs::rename(path, &backup)?;
+    info!("Backed up: {:?} → {:?}", path, backup);
+    Ok(())
+}
+
+fn remove_existing(path: &Path) -> Result<()> {
+    let meta = path.symlink_metadata()?;
+    if meta.is_dir() && !meta.file_type().is_symlink() {
+        fs::remove_dir_all(path)?;
+    } else {
+        fs::remove_file(path)?;
+    }
+    Ok(())
+}
+
+fn is_managed_symlink(destination: &Path, source: &Path) -> bool {
+    if let Ok(link) = fs::read_link(destination) {
+        let abs_link = if link.is_absolute() {
+            link
+        } else {
+            destination.parent().unwrap_or_else(|| Path::new(".")).join(link)
+        };
+        if let (Ok(a), Ok(b)) = (abs_link.canonicalize(), source.canonicalize()) {
+            return a == b;
+        }
+    }
+    false
+}
+
+#[cfg(unix)]
+fn create_symlink(source: &Path, destination: &Path) -> Result<()> {
+    std::os::unix::fs::symlink(source, destination)
+        .map_err(|e| anyhow::anyhow!("Failed to create symlink {} -> {}: {}", destination.display(), source.display(), e))
+}
+
+#[cfg(windows)]
+fn create_symlink(source: &Path, destination: &Path) -> Result<()> {
+    if source.is_dir() {
+        std::os::windows::fs::symlink_dir(source, destination)
+    } else {
+        std::os::windows::fs::symlink_file(source, destination)
+    }
+    .map_err(|e| anyhow::anyhow!("Failed to create symlink on Windows: {}", e))
 }
