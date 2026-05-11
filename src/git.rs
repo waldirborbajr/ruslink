@@ -23,19 +23,16 @@ impl GitRepository {
     pub fn ensure_git_installed() -> Result<()> {
         debug!("Checking if git is installed...");
 
-        let output = Command::new("git")
-            .arg("--version")
-            .output();
+        let output = Command::new("git").arg("--version").output()?;
 
-        match output {
-            Ok(o) if o.status.success() => {
-                debug!("Git found: {}", String::from_utf8_lossy(&o.stdout).trim());
-                Ok(())
-            }
-            _ => {
-                anyhow::bail!("Git is not installed or not found in PATH. Please install Git first.")
-            }
+        if !output.status.success() {
+            anyhow::bail!(
+                "Git is not installed or not found in PATH.\nPlease install Git first."
+            );
         }
+
+        debug!("Git found: {}", String::from_utf8_lossy(&output.stdout).trim());
+        Ok(())
     }
 
     pub fn is_git_repo(&self) -> bool {
@@ -135,6 +132,7 @@ impl GitRepository {
 
     // ====================== Central Command Executor ======================
 
+    /// Executa um comando git com tratamento robusto de erros
     fn run_git(&self, args: &[&str]) -> Result<Output> {
         debug!("git {}", args.join(" "));
 
@@ -144,14 +142,22 @@ impl GitRepository {
             .output()?;
 
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            if !stderr.trim().is_empty() {
-                warn!("git {}: {}", args.join(" "), stderr.trim());
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+            let mut error_msg = format!("git {} failed", args.join(" "));
+
+            if !stderr.is_empty() {
+                error_msg.push_str(&format!("\nstderr: {}", stderr));
             }
-        } else {
-            debug!("git {} succeeded", args.join(" "));
+            if !stdout.is_empty() {
+                error_msg.push_str(&format!("\nstdout: {}", stdout));
+            }
+
+            anyhow::bail!(error_msg);
         }
 
+        debug!("git {} succeeded", args.join(" "));
         Ok(output)
     }
 }
