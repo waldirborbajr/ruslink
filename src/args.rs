@@ -39,6 +39,14 @@ struct Args {
     #[arg(short, long)]
     git: bool,
 
+    /// Overwrite existing destination files if present
+    #[arg(long)]
+    force: bool,
+
+    /// Backup existing files before modifying them
+    #[arg(long)]
+    backup: bool,
+
     /// Custom commit message
     #[arg(short, long)]
     message: Option<String>,
@@ -67,6 +75,8 @@ pub fn parse_args() -> Config {
         dry_run: args.dry_run,
         verbose: args.verbose,
         auto_git: args.git,
+        force: args.force,
+        backup: args.backup,
         commit_message: args.message,
     }
 }

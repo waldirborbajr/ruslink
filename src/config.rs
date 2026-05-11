@@ -10,5 +10,7 @@ pub struct Config {
     pub dry_run: bool,
     pub verbose: bool,
     pub auto_git: bool,
+    pub force: bool,
+    pub backup: bool,
     pub commit_message: Option<String>,
 }
