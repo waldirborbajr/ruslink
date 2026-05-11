@@ -35,8 +35,10 @@ impl GitRepository {
         Ok(())
     }
 
+    /// Verifica se o diretório é um repositório Git (suporta worktrees, submodules, etc.)
     pub fn is_git_repo(&self) -> bool {
-        self.path.join(".git").exists()
+        // Usa `git rev-parse --git-dir` que é muito mais confiável que checar .git diretamente
+        self.run_git_quiet(&["rev-parse", "--git-dir"]).is_ok()
     }
 
     pub fn has_changes(&self) -> Result<bool> {
@@ -47,6 +49,8 @@ impl GitRepository {
         let output = self.run_git(&["status", "--porcelain"])?;
         Ok(!output.stdout.is_empty())
     }
+
+    // ... (demais métodos permanecem iguais)
 
     pub fn auto_commit_silent(&self, package_name: &str) -> Result<()> {
         if !self.is_git_repo() {
@@ -130,9 +134,9 @@ impl GitRepository {
         Ok(())
     }
 
-    // ====================== Central Command Executor ======================
+    // ====================== Command Executors ======================
 
-    /// Executa um comando git com tratamento robusto de erros
+    /// Executa comando git e falha com erro detalhado se não for bem-sucedido
     fn run_git(&self, args: &[&str]) -> Result<Output> {
         debug!("git {}", args.join(" "));
 
@@ -158,6 +162,23 @@ impl GitRepository {
         }
 
         debug!("git {} succeeded", args.join(" "));
+        Ok(output)
+    }
+
+    /// Versão silenciosa para verificações (não gera erro em caso de falha esperada)
+    fn run_git_quiet(&self, args: &[&str]) -> Result<Output> {
+        debug!("git {}", args.join(" "));
+
+        let output = Command::new("git")
+            .current_dir(&self.path)
+            .args(args)
+            .output()?;
+
+        if !output.status.success() {
+            debug!("git {} returned non-zero (expected in this context)", args.join(" "));
+            anyhow::bail!("command failed");
+        }
+
         Ok(output)
     }
 }
