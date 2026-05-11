@@ -1,4 +1,4 @@
-// rustow.rs - Rust Stow with .gitignore + Auto Git Commit
+// ruslink.rs - Rust Stow with .gitignore + Auto Git Commit
 mod args;
 mod config;
 mod git;
