@@ -13,20 +13,32 @@ categories = ["command-line-utilities", "filesystem"]
 [dependencies]
 clap = { version = "4.5", features = ["derive", "env"] }
 regex = "1.11"
-chrono = { version = "0.4", features = ["clock"] }
 anyhow = "1.0"
 tracing = "0.1"
-# tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 human-panic = "1.2"
-pathdiff = "0.2"           # Crucial: relative symlinks
+pathdiff = "0.2"
 once_cell = "1.20"
 
-# Optional but recommended
-colored = "2.1"            # For colored output in the future
+# Dependências opcionais
+colored = { version = "2.1", optional = true }
+chrono = { version = "0.4", features = ["clock"], optional = true }
 
 [dev-dependencies]
 tempfile = "3.10"
+
+[features]
+# Features padrão (recomendado)
+default = ["git", "colors"]
+
+# Suporte a Git (commits, push, timestamps)
+git = ["dep:chrono"]
+
+# Cores no terminal (success, error, warning, etc.)
+colors = ["dep:colored"]
+
+# Build mínima (sem git e sem cores)
+minimal = []
 
 [profile.release]
 opt-level = 3
