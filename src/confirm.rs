@@ -1,10 +1,9 @@
 // src/confirm.rs
 use std::io::{self, Write};
+use tracing::debug;
 
 use crate::config::Config;
 use crate::output::{warning, error};
-
-use tracing::debug;
 
 /// Solicita confirmação do usuário para ações destrutivas
 pub fn confirm_action(action: &str, config: &Config) -> bool {
@@ -37,7 +36,7 @@ pub fn confirm_action(action: &str, config: &Config) -> bool {
     matches!(response.as_str(), "y" | "yes")
 }
 
-/// Versão simplificada para quando só precisa de uma confirmação genérica
+/// Versão simplificada para confirmações genéricas
 pub fn confirm(message: &str, config: &Config) -> bool {
     if config.yes {
         return true;
@@ -53,10 +52,4 @@ pub fn confirm(message: &str, config: &Config) -> bool {
 
     let response = input.trim().to_lowercase();
     matches!(response.as_str(), "y" | "yes")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    // Tests can be added later with mocks if needed
 }
