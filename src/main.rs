@@ -88,7 +88,6 @@ fn main() -> Result<()> {
     } else {
         success("✅ Done!");
         
-        // Mostrar resumo geral
         if total_stats.files_linked > 0 || total_stats.files_removed > 0 {
             info!(
                 "Summary → Linked: {} | Removed: {} | Dirs: {} | Ignored: {}",
@@ -103,7 +102,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-/// Gerencia todas as operações Git
 fn handle_git_operations(package_path: &std::path::Path, config: &config::Config) -> Result<()> {
     if let Err(e) = GitRepository::ensure_git_installed() {
         error(&format!("Git error: {}", e));
@@ -134,7 +132,6 @@ fn handle_git_operations(package_path: &std::path::Path, config: &config::Config
     Ok(())
 }
 
-/// Configura tracing com suporte a RUST_LOG
 fn setup_tracing(verbose: bool) {
     let filter = if verbose {
         EnvFilter::new("ruslink=debug")
