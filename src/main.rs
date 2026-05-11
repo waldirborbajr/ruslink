@@ -1,7 +1,7 @@
 // src/main.rs
 mod args;
 mod config;
-mod confirm;                    // ← Novo
+mod confirm;
 mod git;
 mod ignore;
 mod output;
@@ -9,6 +9,7 @@ mod stow;
 
 use anyhow::Result;
 use tracing::{debug, info, warn};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 use args::parse_args;
 use confirm::confirm_action;
@@ -114,11 +115,19 @@ fn handle_git_operations(package_path: &std::path::Path, config: &config::Config
     Ok(())
 }
 
+/// Configura o tracing com suporte completo ao RUST_LOG
 fn setup_tracing(verbose: bool) {
-    let level = if verbose { "debug" } else { "info" };
+    let filter = if verbose {
+        // Se o usuário usar -v, força debug
+        EnvFilter::new("ruslink=debug")
+    } else {
+        // Permite controle via variável de ambiente RUST_LOG
+        EnvFilter::from_default_env()
+            .add_directive("ruslink=info".parse().unwrap())
+    };
 
-    tracing_subscriber::fmt()
-        .with_env_filter(format!("ruslink={}", level))
+    fmt()
+        .with_env_filter(filter)
         .with_writer(std::io::stdout)
         .init();
 }
