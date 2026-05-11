@@ -1,21 +1,19 @@
 // src/main.rs
-mod args;
-mod config;
-mod confirm;
+mod cli;
 mod git;
-mod ignore;
-mod output;
 mod stow;
+mod utils;
 
 use anyhow::Result;
 use tracing::{debug, info, warn};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-use args::parse_args;
-use confirm::confirm_action;
+use cli::parse_args;
+use cli::Config;
+use utils::confirm_action;
 use git::GitRepository;
-use ignore::load_all_ignore_patterns;
-use output::{success, error, warning};
+use utils::load_all_ignore_patterns;
+use utils::{success, error, warning};
 use stow::{stow_package, unstow_package, StowStats};
 
 fn main() -> Result<()> {
