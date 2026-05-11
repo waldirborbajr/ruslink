@@ -106,7 +106,7 @@ impl GitRepository {
 
     fn has_staged_changes(&self) -> Result<bool> {
         let output = self.run_git(&["diff", "--cached", "--quiet"])?;
-        Ok(output.status.success()) // success = no differences
+        Ok(output.status.success())
     }
 
     fn git_commit(&self, message: &str) -> Result<()> {
@@ -116,7 +116,6 @@ impl GitRepository {
 
     // ====================== Central Command Executor ======================
 
-    /// Executa um comando git de forma centralizada
     fn run_git(&self, args: &[&str]) -> Result<Output> {
         debug!("git {}", args.join(" "));
 
@@ -128,7 +127,7 @@ impl GitRepository {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             if !stderr.trim().is_empty() {
-                warn!("git {} failed: {}", args.join(" "), stderr.trim());
+                warn!("git {}: {}", args.join(" "), stderr.trim());
             }
         } else {
             debug!("git {} succeeded", args.join(" "));
