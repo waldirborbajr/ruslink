@@ -20,6 +20,7 @@ dirs = "5.0"             # Para encontrar ~/.config etc.
 tracing = "0.1"          # Para logging estruturado
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 human-panic = "1.2"      # Para mensagens amigáveis em caso de crash
+pathdiff = "0.2"
 
 [dev-dependencies]
 tempfile = "3.0"
