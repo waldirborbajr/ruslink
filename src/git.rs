@@ -1,10 +1,10 @@
-use std::io;
 use std::path::Path;
 use std::process::Command;
+use anyhow::Result;
 
 use crate::config::Config;
 
-pub fn auto_git_commit(package_path: &Path, config: &Config) -> io::Result<()> {
+pub fn auto_git_commit(package_path: &Path, config: &Config) -> Result<()> {
     // Check if it's a git repository
     if !package_path.join(".git").exists() {
         println!("  Not a git repository. Skipping auto commit.");
@@ -15,7 +15,8 @@ pub fn auto_git_commit(package_path: &Path, config: &Config) -> io::Result<()> {
         .arg("status")
         .arg("--porcelain")
         .current_dir(package_path)
-        .output()?;
+        .output()
+        .map_err(|e| anyhow::anyhow!("failed to get git status: {}", e))?;
 
     if status.stdout.is_empty() {
         println!("  No changes to commit.");
@@ -27,10 +28,11 @@ pub fn auto_git_commit(package_path: &Path, config: &Config) -> io::Result<()> {
         .arg("add")
         .arg(".")
         .current_dir(package_path)
-        .status()?;
+        .status()
+        .map_err(|e| anyhow::anyhow!("failed to run git add: {}", e))?;
 
     if !add_status.success() {
-        return Err(io::Error::new(io::ErrorKind::Other, "git add failed"));
+        anyhow::bail!("git add failed");
     }
 
     // Commit
@@ -46,12 +48,36 @@ pub fn auto_git_commit(package_path: &Path, config: &Config) -> io::Result<()> {
         .arg("-m")
         .arg(message)
         .current_dir(package_path)
-        .status()?;
+        .status()
+        .map_err(|e| anyhow::anyhow!("failed to run git commit: {}", e))?;
 
     if commit_status.success() {
         println!("  ✓ Changes committed successfully!");
     } else {
         println!("  ⚠ Commit failed or was empty.");
+    }
+
+    Ok(())
+}
+
+pub fn auto_git_push(package_path: &Path, _config: &Config) -> Result<()> {
+    // Check if it's a git repository
+    if !package_path.join(".git").exists() {
+        println!("  Not a git repository. Skipping push.");
+        return Ok(());
+    }
+
+    // Push to remote
+    let push_status = Command::new("git")
+        .arg("push")
+        .current_dir(package_path)
+        .status()
+        .map_err(|e| anyhow::anyhow!("failed to run git push: {}", e))?;
+
+    if push_status.success() {
+        println!("  ✓ Changes pushed successfully!");
+    } else {
+        anyhow::bail!("git push failed");
     }
 
     Ok(())

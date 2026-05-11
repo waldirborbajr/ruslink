@@ -45,8 +45,10 @@ This command will stow the `home` package from `~/.dotfiles/home` into the home 
 - `-n, --dry-run`: Simulate actions without making changes
 - `-v, --verbose`: Enable verbose output
 - `-g, --git`: Auto commit changes in the package git repository
+- `--git-push`: Push changes to git remote after commit
 - `--force`: Overwrite existing destination files
 - `--backup`: Backup existing files before modifying them
+- `--adopt`: Adopt existing files (replace with symlink, no backup)
 - `-m, --message <MSG>`: Custom git commit message
 
 ## Ignore files

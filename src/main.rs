@@ -5,23 +5,22 @@ mod git;
 mod ignore;
 mod stow;
 
-use std::process;
+use anyhow::Result;
 
 use args::parse_args;
-use git::auto_git_commit;
+use git::{auto_git_commit, auto_git_push};
 use ignore::load_all_ignore_patterns;
 use stow::{stow_package, unstow_package};
 
-fn main() {
+fn main() -> Result<()> {
     let mut config = parse_args();
     let package_path = config.stow_dir.join(&config.package);
 
     if !package_path.exists() {
-        eprintln!(
+        anyhow::bail!(
             "Error: Package '{}' not found in {:?}",
             config.package, config.stow_dir
         );
-        process::exit(1);
     }
 
     println!("Package: {}", config.package);
@@ -38,13 +37,13 @@ fn main() {
     // Unstow phase
     if config.restow || config.delete {
         println!("Unstowing package '{}'...", config.package);
-        let _ = unstow_package(&package_path, &config.target_dir, &config, &ignore_regexes);
+        unstow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
     }
 
     // Stow phase
     if !config.delete {
         println!("Stowing package '{}'...", config.package);
-        let _ = stow_package(&package_path, &config.target_dir, &config, &ignore_regexes);
+        stow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
     }
 
     // Auto Git Commit
@@ -53,6 +52,14 @@ fn main() {
         if let Err(e) = auto_git_commit(&package_path, &config) {
             eprintln!("Git warning: {}", e);
         }
+
+        // Auto Git Push
+        if config.git_push {
+            println!("\nGit: Pushing changes...");
+            if let Err(e) = auto_git_push(&package_path, &config) {
+                eprintln!("Git push error: {}", e);
+            }
+        }
     }
 
     if config.dry_run {
@@ -60,4 +67,6 @@ fn main() {
     } else {
         println!("\nDone!");
     }
+
+    Ok(())
 }

@@ -1,6 +1,6 @@
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
+use anyhow::Result;
 
 use crate::config::Config;
 use crate::ignore::should_ignore;
@@ -10,7 +10,7 @@ pub fn stow_package(
     target: &Path,
     config: &Config,
     ignores: &[regex::Regex],
-) -> io::Result<()> {
+) -> Result<()> {
     if !source.is_dir() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -26,12 +26,9 @@ pub fn unstow_package(
     target: &Path,
     config: &Config,
     ignores: &[regex::Regex],
-) -> io::Result<()> {
+) -> Result<()> {
     if !source.is_dir() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "source package must be a directory",
-        ));
+        anyhow::bail!("source package must be a directory");
     }
 
     visit_unstow(source, source, target, config, ignores)
@@ -43,7 +40,7 @@ fn visit_source(
     target: &Path,
     config: &Config,
     ignores: &[regex::Regex],
-) -> io::Result<()> {
+) -> Result<()> {
     for entry in fs::read_dir(current)? {
         let entry = entry?;
         let path = entry.path();
@@ -65,13 +62,17 @@ fn visit_source(
     Ok(())
 }
 
-fn stow_item(source: &Path, destination: &Path, config: &Config) -> io::Result<()> {
+fn stow_item(source: &Path, destination: &Path, config: &Config) -> Result<()> {
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent)?;
     }
 
     if destination.exists() || destination.symlink_metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) {
-        if config.force {
+        if config.adopt {
+            // Adopt mode: replace without backup
+            remove_existing(destination)?;
+        } else if config.force {
+            // Force mode: replace with optional backup
             if config.backup {
                 backup_existing(destination)?;
             }
@@ -96,7 +97,7 @@ fn visit_unstow(
     target: &Path,
     config: &Config,
     ignores: &[regex::Regex],
-) -> io::Result<()> {
+) -> Result<()> {
     for entry in fs::read_dir(current)? {
         let entry = entry?;
         let path = entry.path();
@@ -146,7 +147,7 @@ fn should_remove_link(destination: &Path, source: &Path) -> bool {
     false
 }
 
-fn backup_existing(path: &Path) -> io::Result<()> {
+fn backup_existing(path: &Path) -> Result<()> {
     let mut backup = path.with_extension("bak");
     let mut counter = 1;
     while backup.exists() {
@@ -156,7 +157,7 @@ fn backup_existing(path: &Path) -> io::Result<()> {
     fs::rename(path, backup)
 }
 
-fn remove_existing(path: &Path) -> io::Result<()> {
+fn remove_existing(path: &Path) -> Result<()> {
     let metadata = path.symlink_metadata()?;
     if metadata.file_type().is_dir() && !metadata.file_type().is_symlink() {
         fs::remove_dir_all(path)
@@ -166,15 +167,18 @@ fn remove_existing(path: &Path) -> io::Result<()> {
 }
 
 #[cfg(unix)]
-fn create_symlink(source: &Path, destination: &Path) -> io::Result<()> {
+fn create_symlink(source: &Path, destination: &Path) -> Result<()> {
     std::os::unix::fs::symlink(source, destination)
+        .map_err(|e| anyhow::anyhow!("failed to create symlink: {}", e))
 }
 
 #[cfg(windows)]
-fn create_symlink(source: &Path, destination: &Path) -> io::Result<()> {
+fn create_symlink(source: &Path, destination: &Path) -> Result<()> {
     if source.is_dir() {
         std::os::windows::fs::symlink_dir(source, destination)
+            .map_err(|e| anyhow::anyhow!("failed to create symlink_dir: {}", e))
     } else {
         std::os::windows::fs::symlink_file(source, destination)
+            .map_err(|e| anyhow::anyhow!("failed to create symlink_file: {}", e))
     }
 }

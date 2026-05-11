@@ -39,6 +39,10 @@ struct Args {
     #[arg(short, long)]
     git: bool,
 
+    /// Push changes to git remote after commit
+    #[arg(long)]
+    git_push: bool,
+
     /// Overwrite existing destination files if present
     #[arg(long)]
     force: bool,
@@ -46,6 +50,10 @@ struct Args {
     /// Backup existing files before modifying them
     #[arg(long)]
     backup: bool,
+
+    /// Adopt existing files (replace with symlink, no backup)
+    #[arg(long)]
+    adopt: bool,
 
     /// Custom commit message
     #[arg(short, long)]
@@ -75,8 +83,10 @@ pub fn parse_args() -> Config {
         dry_run: args.dry_run,
         verbose: args.verbose,
         auto_git: args.git,
+        git_push: args.git_push,
         force: args.force,
         backup: args.backup,
+        adopt: args.adopt,
         commit_message: args.message,
     }
 }
