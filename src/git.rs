@@ -6,6 +6,33 @@ use tracing::{debug, info, warn};
 
 use crate::config::Config;
 
+/// Sanitiza mensagem de commit para segurança e boas práticas do Git
+fn sanitize_commit_message(message: &str) -> String {
+    let mut sanitized = message.trim().to_string();
+
+    // Limpa e normaliza linhas
+    sanitized = sanitized
+        .lines()
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    // Limita tamanho da primeira linha (Git best practice)
+    if let Some(first_line) = sanitized.lines().next() {
+        if first_line.len() > 100 {
+            sanitized = first_line.chars().take(97).collect::<String>() + "...";
+        }
+    }
+
+    // Fallback caso fique vazia
+    if sanitized.trim().is_empty() {
+        sanitized = "Update configuration".to_string();
+    }
+
+    sanitized
+}
+
 /// Representa um repositório Git gerenciado pelo ruslink
 #[derive(Debug)]
 pub struct GitRepository {
@@ -19,6 +46,7 @@ impl GitRepository {
         }
     }
 
+    /// Verifica se o Git está instalado no sistema
     pub fn ensure_git_installed() -> Result<()> {
         debug!("Checking if git is installed...");
 
@@ -32,6 +60,7 @@ impl GitRepository {
         Ok(())
     }
 
+    /// Verifica se o diretório atual é um repositório Git (suporta worktrees, submodules, etc.)
     pub fn is_git_repo(&self) -> bool {
         self.run_git_quiet(&["rev-parse", "--git-dir"]).is_ok()
     }
@@ -40,28 +69,12 @@ impl GitRepository {
         if !self.is_git_repo() {
             return Ok(false);
         }
+
         let output = self.run_git(&["status", "--porcelain"])?;
         Ok(!output.stdout.is_empty())
     }
 
-    // ====================== Git Commands ======================
-
-    fn git_add(&self) -> Result<()> {
-        // git add -A é mais apropriado que "git add ."
-        // Ele também remove arquivos deletados do index
-        self.run_git(&["add", "-A"])?;
-        Ok(())
-    }
-
-    fn has_staged_changes(&self) -> Result<bool> {
-        let output = self.run_git(&["diff", "--cached", "--quiet"])?;
-        Ok(output.status.success())
-    }
-
-    fn git_commit(&self, message: &str) -> Result<()> {
-        self.run_git(&["commit", "-m", message])?;
-        Ok(())
-    }
+    // ====================== Operações Públicas ======================
 
     pub fn auto_commit_silent(&self, package_name: &str) -> Result<()> {
         if !self.is_git_repo() {
@@ -101,7 +114,7 @@ impl GitRepository {
 
         self.git_add()?;
 
-        let message = config.commit_message.clone().unwrap_or_else(|| {
+        let raw_message = config.commit_message.clone().unwrap_or_else(|| {
             format!(
                 "Update {} configuration - {}",
                 config.package,
@@ -109,7 +122,7 @@ impl GitRepository {
             )
         });
 
-        self.git_commit(&message)?;
+        self.git_commit(&raw_message)?;
         info!("✓ Changes committed successfully!");
         Ok(())
     }
@@ -121,13 +134,37 @@ impl GitRepository {
         }
 
         info!("Pushing changes to remote...");
+
         self.run_git(&["push"])?;
         info!("✓ Successfully pushed to remote!");
+
         Ok(())
     }
 
-    // ====================== Command Executors ======================
+    // ====================== Comandos Internos ======================
 
+    fn git_add(&self) -> Result<()> {
+        // Usa -A para adicionar, modificar e remover arquivos (melhor que ".")
+        self.run_git(&["add", "-A"])?;
+        Ok(())
+    }
+
+    fn has_staged_changes(&self) -> Result<bool> {
+        let output = self.run_git(&["diff", "--cached", "--quiet"])?;
+        Ok(output.status.success()) // success = não há diferenças
+    }
+
+    fn git_commit(&self, message: &str) -> Result<()> {
+        let clean_message = sanitize_commit_message(message);
+        debug!("Commit message: {}", clean_message.replace('\n', "\\n"));
+
+        self.run_git(&["commit", "-m", &clean_message])?;
+        Ok(())
+    }
+
+    // ====================== Executores Centralizados ======================
+
+    /// Executa comando git com tratamento completo de erros
     fn run_git(&self, args: &[&str]) -> Result<Output> {
         debug!("git {}", args.join(" "));
 
@@ -141,12 +178,14 @@ impl GitRepository {
             let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
             let mut error_msg = format!("git {} failed", args.join(" "));
+
             if !stderr.is_empty() {
                 error_msg.push_str(&format!("\nstderr: {}", stderr));
             }
             if !stdout.is_empty() {
                 error_msg.push_str(&format!("\nstdout: {}", stdout));
             }
+
             anyhow::bail!(error_msg);
         }
 
@@ -154,6 +193,7 @@ impl GitRepository {
         Ok(output)
     }
 
+    /// Versão silenciosa para verificações (não gera erro visível quando falha é esperada)
     fn run_git_quiet(&self, args: &[&str]) -> Result<Output> {
         let output = Command::new("git")
             .current_dir(&self.path)
@@ -161,9 +201,10 @@ impl GitRepository {
             .output()?;
 
         if !output.status.success() {
-            debug!("git {} returned non-zero (expected)", args.join(" "));
+            debug!("git {} returned non-zero (expected in this context)", args.join(" "));
             anyhow::bail!("command failed");
         }
+
         Ok(output)
     }
 }
