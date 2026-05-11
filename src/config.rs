@@ -26,5 +26,12 @@ pub struct Config {
     pub adopt: bool,
 
     // Confirmation
-    pub yes: bool,          // ← Novo campo
+    pub yes: bool,
+}
+
+impl Config {
+    /// Retorna se alguma operação destrutiva será realizada
+    pub fn is_destructive(&self) -> bool {
+        self.delete || self.restow || self.force || self.adopt
+    }
 }
