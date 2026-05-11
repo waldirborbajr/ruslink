@@ -1,40 +1,46 @@
 // src/ignore.rs
-use std::fs;
-use std::io::BufRead;
 use std::path::Path;
+use std::sync::OnceLock;
 
 use regex::Regex;
 
-/// Carrega todos os padrões de ignore (.gitignore + .ruslink.ignore + defaults)
+static GLOBAL_IGNORE_PATTERNS: OnceLock<Vec<Regex>> = OnceLock::new();
+
+/// Carrega todos os padrões de ignore com cache global
 pub fn load_all_ignore_patterns(package_path: &Path) -> Vec<Regex> {
-    let mut regexes = Vec::new();
+    // Padrões globais (sempre os mesmos)
+    let global_patterns = GLOBAL_IGNORE_PATTERNS.get_or_init(|| {
+        let mut regexes = Vec::new();
 
-    // Padrões padrão
-    for pat in [
-        r"^\.git$",
-        r"^\.gitmodules$",
-        r"^\.gitignore$",
-        r"^\.ruslink\.ignore$",
-        r"^README.*$",
-        r"^LICENSE.*$",
-        r"^COPYING.*$",
-        r".*\.bak$",
-        r".*\.tmp$",
-        r"^\.DS_Store$",
-    ] {
-        if let Ok(re) = Regex::new(pat) {
-            regexes.push(re);
+        // Padrões padrão
+        for pat in [
+            r"^\.git$",
+            r"^\.gitmodules$",
+            r"^\.gitignore$",
+            r"^\.ruslink\.ignore$",
+            r"^README.*$",
+            r"^LICENSE.*$",
+            r"^COPYING.*$",
+            r".*\.bak$",
+            r".*\.tmp$",
+            r"^\.DS_Store$",
+        ] {
+            if let Ok(re) = Regex::new(pat) {
+                regexes.push(re);
+            }
         }
-    }
 
-    if let Some(git) = load_gitignore(package_path) {
-        regexes.extend(git);
-    }
-    if let Some(ruslink) = load_ruslink_ignore(package_path) {
-        regexes.extend(ruslink);
-    }
+        if let Some(git) = load_gitignore(package_path) {
+            regexes.extend(git);
+        }
+        if let Some(ruslink) = load_ruslink_ignore(package_path) {
+            regexes.extend(ruslink);
+        }
 
-    regexes
+        regexes
+    });
+
+    global_patterns.clone()
 }
 
 fn load_gitignore(base: &Path) -> Option<Vec<Regex>> {
@@ -44,8 +50,8 @@ fn load_gitignore(base: &Path) -> Option<Vec<Regex>> {
     }
 
     let mut regexes = Vec::new();
-    if let Ok(file) = fs::File::open(path) {
-        for line in BufRead::lines(std::io::BufReader::new(file)).flatten() {
+    if let Ok(file) = std::fs::File::open(path) {
+        for line in std::io::BufRead::lines(std::io::BufReader::new(file)).flatten() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
                 continue;
@@ -65,8 +71,8 @@ fn load_ruslink_ignore(base: &Path) -> Option<Vec<Regex>> {
     }
 
     let mut regexes = Vec::new();
-    if let Ok(file) = fs::File::open(path) {
-        for line in BufRead::lines(std::io::BufReader::new(file)).flatten() {
+    if let Ok(file) = std::fs::File::open(path) {
+        for line in std::io::BufRead::lines(std::io::BufReader::new(file)).flatten() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
                 continue;
