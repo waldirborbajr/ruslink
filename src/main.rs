@@ -10,7 +10,7 @@ use anyhow::Result;
 use tracing::{debug, info, warn};
 
 use args::parse_args;
-use git::{auto_git_commit, auto_git_push, has_git_changes, auto_git_commit_silent};
+use git::GitRepository;           // ← Import atualizado
 use ignore::load_all_ignore_patterns;
 use output::{success, error, warning};
 use stow::{stow_package, unstow_package};
@@ -51,9 +51,10 @@ fn main() -> Result<()> {
         stow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
     }
 
-    // Git
+    // Git Operations
     if !config.dry_run && !config.delete {
-        handle_git_operations(&package_path, &config)?;
+        let repo = GitRepository::new(&package_path);
+        handle_git_operations(&repo, &config)?;
     }
 
     if config.dry_run {
@@ -65,22 +66,23 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn handle_git_operations(package_path: &std::path::Path, config: &config::Config) -> Result<()> {
+fn handle_git_operations(repo: &GitRepository, config: &config::Config) -> Result<()> {
     if config.auto_git {
         info!("Git: Checking for changes...");
-        if let Err(e) = auto_git_commit(package_path, config) {
+        
+        if let Err(e) = repo.commit(config) {
             warning(&format!("Git commit warning: {}", e));
         }
 
         if config.git_push {
             info!("Git: Pushing changes...");
-            if let Err(e) = auto_git_push(package_path, config) {
+            if let Err(e) = repo.push() {
                 warning(&format!("Git push failed: {}", e));
             }
         }
-    } else if let Ok(true) = has_git_changes(package_path) {
+    } else if let Ok(true) = repo.has_changes() {
         info!("Changes detected. Creating automatic commit...");
-        if let Err(e) = auto_git_commit_silent(package_path, &config.package) {
+        if let Err(e) = repo.auto_commit_silent(&config.package) {
             debug!("Auto-commit failed: {}", e);
         }
     }
