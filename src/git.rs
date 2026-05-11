@@ -5,6 +5,68 @@ use tracing::{debug, info};
 
 use crate::config::Config;
 
+pub fn has_git_changes(package_path: &Path) -> Result<bool> {
+    // Check if it's a git repository
+    if !package_path.join(".git").exists() {
+        return Ok(false);
+    }
+
+    let status = Command::new("git")
+        .arg("status")
+        .arg("--porcelain")
+        .current_dir(package_path)
+        .output()
+        .map_err(|e| anyhow::anyhow!("failed to get git status: {}", e))?;
+
+    Ok(!status.stdout.is_empty())
+}
+
+pub fn auto_git_commit_silent(package_path: &Path, package_name: &str) -> Result<()> {
+    // Check if it's a git repository
+    if !package_path.join(".git").exists() {
+        debug!("Not a git repository. Skipping auto commit.");
+        return Ok(());
+    }
+
+    debug!("Auto-committing changes (silent mode)...");
+
+    // Add all changes
+    let add_status = Command::new("git")
+        .arg("add")
+        .arg(".")
+        .current_dir(package_path)
+        .status()
+        .map_err(|e| anyhow::anyhow!("failed to run git add: {}", e))?;
+
+    if !add_status.success() {
+        anyhow::bail!("git add failed");
+    }
+
+    // Create automatic commit message
+    let message = format!(
+        "Commit Automático {}",
+        chrono::Local::now().format("%Y-%m-%d %H:%M")
+    );
+
+    debug!("Automatic commit message: {}", message);
+
+    let commit_status = Command::new("git")
+        .arg("commit")
+        .arg("-m")
+        .arg(&message)
+        .current_dir(package_path)
+        .status()
+        .map_err(|e| anyhow::anyhow!("failed to run git commit: {}", e))?;
+
+    if commit_status.success() {
+        info!("✓ Auto-commit successful: '{}'", message);
+    } else {
+        debug!("Auto-commit failed or was empty.");
+    }
+
+    Ok(())
+}
+
 pub fn auto_git_commit(package_path: &Path, config: &Config) -> Result<()> {
     // Check if it's a git repository
     if !package_path.join(".git").exists() {

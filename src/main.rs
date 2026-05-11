@@ -10,7 +10,7 @@ use tracing::{debug, info, warn};
 use tracing_subscriber::EnvFilter;
 
 use args::parse_args;
-use git::{auto_git_commit, auto_git_push};
+use git::{auto_git_commit, auto_git_push, has_git_changes, auto_git_commit_silent};
 use ignore::load_all_ignore_patterns;
 use stow::{stow_package, unstow_package};
 
@@ -58,18 +58,37 @@ fn main() -> Result<()> {
         stow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
     }
 
-    // Auto Git Commit
-    if config.auto_git && !config.dry_run && !config.delete {
-        info!("Git: Checking for changes...");
-        if let Err(e) = auto_git_commit(&package_path, &config) {
-            warn!("Git warning: {}", e);
-        }
+    // Git handling - at the end of execution
+    if !config.dry_run && !config.delete {
+        if config.auto_git {
+            // Manual git mode: user explicitly requested git operations
+            info!("Git: Checking for changes...");
+            if let Err(e) = auto_git_commit(&package_path, &config) {
+                warn!("Git warning: {}", e);
+            }
 
-        // Auto Git Push
-        if config.git_push {
-            info!("Git: Pushing changes...");
-            if let Err(e) = auto_git_push(&package_path, &config) {
-                warn!("Git push error: {}", e);
+            // Manual Git Push
+            if config.git_push {
+                info!("Git: Pushing changes...");
+                if let Err(e) = auto_git_push(&package_path, &config) {
+                    warn!("Git push error: {}", e);
+                }
+            }
+        } else {
+            // Automatic git mode: check for changes and auto-commit if there are any
+            match has_git_changes(&package_path) {
+                Ok(true) => {
+                    info!("Changes detected in git repository. Running automatic commit...");
+                    if let Err(e) = auto_git_commit_silent(&package_path, &config.package) {
+                        debug!("Automatic commit failed: {}", e);
+                    }
+                }
+                Ok(false) => {
+                    debug!("No changes in git repository.");
+                }
+                Err(e) => {
+                    debug!("Failed to check git status: {}", e);
+                }
             }
         }
     }
