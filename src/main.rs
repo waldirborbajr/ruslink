@@ -51,8 +51,8 @@ fn main() -> Result<()> {
             }
         }
 
-        if config.force && !config.delete {
-            if !confirm_action("FORCE overwrite existing files", &config) {
+        if (config.force || config.adopt) && !config.delete {
+            if !confirm_action("FORCE / ADOPT existing files", &config) {
                 warning("Operation cancelled by user.");
                 std::process::exit(0);
             }
@@ -85,7 +85,9 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/// Gerencia todas as operações Git
 fn handle_git_operations(package_path: &std::path::Path, config: &config::Config) -> Result<()> {
+    // Verifica se o Git está instalado
     if let Err(e) = GitRepository::ensure_git_installed() {
         error(&format!("Git error: {}", e));
         std::process::exit(1);
@@ -115,13 +117,13 @@ fn handle_git_operations(package_path: &std::path::Path, config: &config::Config
     Ok(())
 }
 
-/// Configura o tracing com suporte completo ao RUST_LOG
+/// Configura tracing com suporte completo a RUST_LOG
 fn setup_tracing(verbose: bool) {
     let filter = if verbose {
-        // Se o usuário usar -v, força debug
+        // --verbose força debug
         EnvFilter::new("ruslink=debug")
     } else {
-        // Permite controle via variável de ambiente RUST_LOG
+        // Permite controle via RUST_LOG (ex: RUST_LOG=debug ruslink ...)
         EnvFilter::from_default_env()
             .add_directive("ruslink=info".parse().unwrap())
     };
