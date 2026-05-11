@@ -1,6 +1,6 @@
 // src/git.rs
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 use anyhow::Result;
 use tracing::{debug, info, warn};
 
@@ -28,15 +28,10 @@ impl GitRepository {
             return Ok(false);
         }
 
-        let output = self.git_command()
-            .arg("status")
-            .arg("--porcelain")
-            .output()?;
-
+        let output = self.run_git(&["status", "--porcelain"])?;
         Ok(!output.stdout.is_empty())
     }
 
-    /// Commit silencioso automático
     pub fn auto_commit_silent(&self, package_name: &str) -> Result<()> {
         if !self.is_git_repo() {
             debug!("Not a git repository. Skipping auto-commit.");
@@ -46,7 +41,7 @@ impl GitRepository {
         debug!("Auto-committing changes for package: {}", package_name);
 
         self.git_add()?;
-        
+
         if self.has_staged_changes()? {
             debug!("No changes to commit after git add.");
             return Ok(());
@@ -62,7 +57,6 @@ impl GitRepository {
         Ok(())
     }
 
-    /// Commit com mensagem configurável (usado com --git)
     pub fn commit(&self, config: &Config) -> Result<()> {
         if !self.is_git_repo() {
             debug!("Not a git repository.");
@@ -89,7 +83,6 @@ impl GitRepository {
         Ok(())
     }
 
-    /// Push para o remote
     pub fn push(&self) -> Result<()> {
         if !self.is_git_repo() {
             debug!("Not a git repository. Skipping push.");
@@ -98,55 +91,49 @@ impl GitRepository {
 
         info!("Pushing changes to remote...");
 
-        let status = self.git_command().arg("push").status()?;
-
-        if status.success() {
-            info!("✓ Successfully pushed to remote!");
-        } else {
-            anyhow::bail!("git push failed");
-        }
+        self.run_git(&["push"])?;
+        info!("✓ Successfully pushed to remote!");
 
         Ok(())
     }
 
-    // ====================== Helpers ======================
-
-    /// Retorna um Command já configurado com o diretório correto
-    fn git_command(&self) -> Command {
-        let mut cmd = Command::new("git");
-        cmd.current_dir(&self.path);
-        cmd
-    }
+    // ====================== Git Commands ======================
 
     fn git_add(&self) -> Result<()> {
-        let status = self.git_command().arg("add").arg(".").status()?;
-
-        if !status.success() {
-            anyhow::bail!("git add failed");
-        }
+        self.run_git(&["add", "."])?;
         Ok(())
     }
 
     fn has_staged_changes(&self) -> Result<bool> {
-        let status = self.git_command()
-            .arg("diff")
-            .arg("--cached")
-            .arg("--quiet")
-            .status()?;
-
-        Ok(status.success()) // success significa "não há diferenças"
+        let output = self.run_git(&["diff", "--cached", "--quiet"])?;
+        Ok(output.status.success()) // success = no differences
     }
 
     fn git_commit(&self, message: &str) -> Result<()> {
-        let status = self.git_command()
-            .arg("commit")
-            .arg("-m")
-            .arg(message)
-            .status()?;
-
-        if !status.success() {
-            debug!("Commit returned non-zero (possibly no changes).");
-        }
+        self.run_git(&["commit", "-m", message])?;
         Ok(())
+    }
+
+    // ====================== Central Command Executor ======================
+
+    /// Executa um comando git de forma centralizada
+    fn run_git(&self, args: &[&str]) -> Result<Output> {
+        debug!("git {}", args.join(" "));
+
+        let output = Command::new("git")
+            .current_dir(&self.path)
+            .args(args)
+            .output()?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if !stderr.trim().is_empty() {
+                warn!("git {} failed: {}", args.join(" "), stderr.trim());
+            }
+        } else {
+            debug!("git {} succeeded", args.join(" "));
+        }
+
+        Ok(output)
     }
 }
