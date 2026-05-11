@@ -1,6 +1,7 @@
 // src/main.rs
 mod args;
 mod config;
+mod confirm;                    // ← Novo
 mod git;
 mod ignore;
 mod output;
@@ -10,6 +11,7 @@ use anyhow::Result;
 use tracing::{debug, info, warn};
 
 use args::parse_args;
+use confirm::confirm_action;
 use git::GitRepository;
 use ignore::load_all_ignore_patterns;
 use output::{success, error, warning};
@@ -39,6 +41,23 @@ fn main() -> Result<()> {
     let ignore_regexes = load_all_ignore_patterns(&package_path);
     debug!("Loaded {} ignore patterns", ignore_regexes.len());
 
+    // ====================== CONFIRM DESTRUCTIVE ACTIONS ======================
+    if !config.yes && !config.dry_run {
+        if config.delete || config.restow {
+            if !confirm_action("DELETE / UNSTOW", &config) {
+                warning("Operation cancelled by user.");
+                std::process::exit(0);
+            }
+        }
+
+        if config.force && !config.delete {
+            if !confirm_action("FORCE overwrite existing files", &config) {
+                warning("Operation cancelled by user.");
+                std::process::exit(0);
+            }
+        }
+    }
+
     // Unstow
     if config.restow || config.delete {
         info!("Unstowing package '{}'...", config.package);
@@ -65,9 +84,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-/// Gerencia todas as operações relacionadas ao Git
 fn handle_git_operations(package_path: &std::path::Path, config: &config::Config) -> Result<()> {
-    // Verifica se Git está instalado antes de qualquer operação
     if let Err(e) = GitRepository::ensure_git_installed() {
         error(&format!("Git error: {}", e));
         std::process::exit(1);
