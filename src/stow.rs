@@ -1,11 +1,15 @@
+// src/stow.rs
 use std::fs;
 use std::path::{Path, PathBuf};
+
 use anyhow::Result;
+use pathdiff::diff_paths;
 use tracing::{debug, info};
 
 use crate::config::Config;
 use crate::ignore::should_ignore;
 
+/// Stow a package (create symlinks)
 pub fn stow_package(
     source: &Path,
     target: &Path,
@@ -13,12 +17,14 @@ pub fn stow_package(
     ignores: &[regex::Regex],
 ) -> Result<()> {
     if !source.is_dir() {
-        anyhow::bail!("source package must be a directory");
+        anyhow::bail!("Source package must be a directory: {:?}", source);
     }
 
+    info!("Stowing from {:?} → {:?}", source, target);
     visit_source(source, source, target, config, ignores)
 }
 
+/// Unstow a package (remove symlinks)
 pub fn unstow_package(
     source: &Path,
     target: &Path,
@@ -26,33 +32,39 @@ pub fn unstow_package(
     ignores: &[regex::Regex],
 ) -> Result<()> {
     if !source.is_dir() {
-        anyhow::bail!("source package must be a directory");
+        anyhow::bail!("Source package must be a directory: {:?}", source);
     }
 
+    info!("Unstowing from {:?} → {:?}", source, target);
     visit_unstow(source, source, target, config, ignores)
 }
+
+// ====================== STOW ======================
 
 fn visit_source(
     root: &Path,
     current: &Path,
-    target: &Path,
+    target_base: &Path,
     config: &Config,
     ignores: &[regex::Regex],
 ) -> Result<()> {
     for entry in fs::read_dir(current)? {
         let entry = entry?;
         let path = entry.path();
-        let rel = path.strip_prefix(root).unwrap();
+        let rel_path = path.strip_prefix(root).unwrap_or(&path);
 
-        if should_ignore(rel, ignores) {
+        if should_ignore(rel_path, ignores) {
+            debug!("Ignored: {:?}", rel_path);
             continue;
         }
 
-        let destination = target.join(rel);
+        let destination = target_base.join(rel_path);
 
         if entry.file_type()?.is_dir() {
-            fs::create_dir_all(&destination)?;
-            visit_source(root, &path, target, config, ignores)?;
+            if !config.dry_run {
+                fs::create_dir_all(&destination)?;
+            }
+            visit_source(root, &path, target_base, config, ignores)?;
         } else {
             stow_item(&path, &destination, config)?;
         }
@@ -62,91 +74,113 @@ fn visit_source(
 
 fn stow_item(source: &Path, destination: &Path, config: &Config) -> Result<()> {
     if let Some(parent) = destination.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    if destination.exists() || destination.symlink_metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) {
-        if config.adopt {
-            // Adopt mode: replace without backup
-            debug!("Adopting existing file: {:?}", destination);
-            remove_existing(destination)?;
-        } else if config.force {
-            // Force mode: replace with optional backup
-            if config.backup {
-                debug!("Backing up existing file: {:?}", destination);
-                backup_existing(destination)?;
-            }
-            debug!("Force removing existing file: {:?}", destination);
-            remove_existing(destination)?;
-        } else {
-            debug!("Skipping existing destination: {:?}", destination);
-            return Ok(());
+        if !config.dry_run {
+            fs::create_dir_all(parent)?;
         }
     }
 
+    // Handle existing destination
+    if destination.exists() || destination.symlink_metadata().is_ok() {
+        handle_existing_destination(destination, config)?;
+    }
+
     if config.dry_run {
-        debug!("DRY RUN: would link {:?} -> {:?}", destination, source);
+        info!("DRY RUN: would link {:?} → {:?}", destination, source);
         return Ok(());
     }
 
-    debug!("Creating symlink: {:?} -> {:?}", destination, source);
-    create_symlink(source, destination)
+    let relative = make_relative(source, destination);
+    create_symlink(&relative, destination)?;
+
+    info!("Linked: {:?} → {:?}", destination, relative);
+    Ok(())
 }
+
+fn handle_existing_destination(destination: &Path, config: &Config) -> Result<()> {
+    if destination.symlink_metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) {
+        if config.dry_run {
+            debug!("Would remove existing symlink: {:?}", destination);
+        } else {
+            fs::remove_file(destination)?;
+        }
+        return Ok(());
+    }
+
+    // Real file or directory exists
+    if config.adopt {
+        debug!("Adopting existing file: {:?}", destination);
+        remove_existing(destination)?;
+    } else if config.force {
+        if config.backup {
+            backup_existing(destination)?;
+        }
+        remove_existing(destination)?;
+    } else {
+        anyhow::bail!("Conflict: {:?} already exists (use --force or --adopt)", destination);
+    }
+    Ok(())
+}
+
+// ====================== UNSTOW ======================
 
 fn visit_unstow(
     root: &Path,
     current: &Path,
-    target: &Path,
+    target_base: &Path,
     config: &Config,
     ignores: &[regex::Regex],
 ) -> Result<()> {
     for entry in fs::read_dir(current)? {
         let entry = entry?;
         let path = entry.path();
-        let rel = path.strip_prefix(root).unwrap();
+        let rel_path = path.strip_prefix(root).unwrap_or(&path);
 
-        if should_ignore(rel, ignores) {
+        if should_ignore(rel_path, ignores) {
             continue;
         }
 
-        let destination = target.join(rel);
+        let destination = target_base.join(rel_path);
 
         if entry.file_type()?.is_dir() {
-            visit_unstow(root, &path, target, config, ignores)?;
-        }
-
-        if destination.exists() {
-            if destination.symlink_metadata()?.file_type().is_symlink() {
-                if should_remove_link(&destination, &path) {
-                    if config.backup {
-                        backup_existing(&destination)?;
-                    }
-                    if config.dry_run {
-                        println!("DRY RUN: remove {:?}", destination);
-                    } else {
-                        fs::remove_file(&destination)?;
-                    }
-                }
+            visit_unstow(root, &path, target_base, config, ignores)?;
+            // Try to remove empty directory
+            if !config.dry_run && destination.exists() {
+                let _ = fs::remove_dir(&destination);
+            }
+        } else if is_managed_symlink(&destination, &path) {
+            if config.backup {
+                backup_existing(&destination)?;
+            }
+            if config.dry_run {
+                info!("DRY RUN: would remove {:?}", destination);
+            } else {
+                fs::remove_file(&destination)?;
+                info!("Removed: {:?}", destination);
             }
         }
     }
     Ok(())
 }
 
-fn should_remove_link(destination: &Path, source: &Path) -> bool {
-    if let Ok(link_target) = fs::read_link(destination) {
-        let abs_link = if link_target.is_absolute() {
-            link_target
+fn is_managed_symlink(destination: &Path, source: &Path) -> bool {
+    if let Ok(link) = fs::read_link(destination) {
+        let abs_link = if link.is_absolute() {
+            link
         } else {
-            destination.parent().unwrap_or_else(|| Path::new(".")).join(link_target)
+            destination.parent().unwrap_or_else(|| Path::new(".")).join(link)
         };
-        if let Ok(link_canon) = abs_link.canonicalize() {
-            if let Ok(src_canon) = source.canonicalize() {
-                return link_canon == src_canon;
-            }
+        if let (Ok(a), Ok(b)) = (abs_link.canonicalize(), source.canonicalize()) {
+            return a == b;
         }
     }
     false
+}
+
+// ====================== HELPERS ======================
+
+fn make_relative(source: &Path, destination: &Path) -> PathBuf {
+    diff_paths(source, destination.parent().unwrap_or(destination))
+        .unwrap_or_else(|| source.to_path_buf())
 }
 
 fn backup_existing(path: &Path) -> Result<()> {
@@ -156,31 +190,33 @@ fn backup_existing(path: &Path) -> Result<()> {
         backup = path.with_extension(format!("bak{}", counter));
         counter += 1;
     }
-    fs::rename(path, backup)
+    fs::rename(path, &backup)?;
+    info!("Backed up: {:?} → {:?}", path, backup);
+    Ok(())
 }
 
 fn remove_existing(path: &Path) -> Result<()> {
-    let metadata = path.symlink_metadata()?;
-    if metadata.file_type().is_dir() && !metadata.file_type().is_symlink() {
-        fs::remove_dir_all(path)
+    let meta = path.symlink_metadata()?;
+    if meta.is_dir() && !meta.file_type().is_symlink() {
+        fs::remove_dir_all(path)?;
     } else {
-        fs::remove_file(path)
+        fs::remove_file(path)?;
     }
+    Ok(())
 }
 
 #[cfg(unix)]
 fn create_symlink(source: &Path, destination: &Path) -> Result<()> {
     std::os::unix::fs::symlink(source, destination)
-        .map_err(|e| anyhow::anyhow!("failed to create symlink: {}", e))
+        .map_err(|e| anyhow::anyhow!("Failed to create symlink {} -> {}: {}", destination.display(), source.display(), e))
 }
 
 #[cfg(windows)]
 fn create_symlink(source: &Path, destination: &Path) -> Result<()> {
     if source.is_dir() {
         std::os::windows::fs::symlink_dir(source, destination)
-            .map_err(|e| anyhow::anyhow!("failed to create symlink_dir: {}", e))
     } else {
         std::os::windows::fs::symlink_file(source, destination)
-            .map_err(|e| anyhow::anyhow!("failed to create symlink_file: {}", e))
     }
+    .map_err(|e| anyhow::anyhow!("Failed to create symlink on Windows: {}", e))
 }
