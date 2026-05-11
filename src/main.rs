@@ -16,7 +16,7 @@ use confirm::confirm_action;
 use git::GitRepository;
 use ignore::load_all_ignore_patterns;
 use output::{success, error, warning};
-use stow::{stow_package, unstow_package};
+use stow::{stow_package, unstow_package, StowStats};
 
 fn main() -> Result<()> {
     human_panic::setup_panic!();
@@ -59,16 +59,22 @@ fn main() -> Result<()> {
         }
     }
 
+    let mut total_stats = StowStats::default();
+
     // Unstow
     if config.restow || config.delete {
         info!("Unstowing package '{}'...", config.package);
-        unstow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
+        let unstow_stats = unstow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
+        total_stats.files_removed = unstow_stats.files_removed;
     }
 
     // Stow
     if !config.delete {
         info!("Stowing package '{}'...", config.package);
-        stow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
+        let stow_stats = stow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
+        total_stats.files_linked = stow_stats.files_linked;
+        total_stats.dirs_created = stow_stats.dirs_created;
+        total_stats.files_ignored = stow_stats.files_ignored;
     }
 
     // Git Operations
@@ -76,10 +82,22 @@ fn main() -> Result<()> {
         handle_git_operations(&package_path, &config)?;
     }
 
+    // Final Summary
     if config.dry_run {
         warning("Dry run completed. No changes were made.");
     } else {
         success("✅ Done!");
+        
+        // Mostrar resumo geral
+        if total_stats.files_linked > 0 || total_stats.files_removed > 0 {
+            info!(
+                "Summary → Linked: {} | Removed: {} | Dirs: {} | Ignored: {}",
+                total_stats.files_linked,
+                total_stats.files_removed,
+                total_stats.dirs_created,
+                total_stats.files_ignored
+            );
+        }
     }
 
     Ok(())
@@ -87,7 +105,6 @@ fn main() -> Result<()> {
 
 /// Gerencia todas as operações Git
 fn handle_git_operations(package_path: &std::path::Path, config: &config::Config) -> Result<()> {
-    // Verifica se o Git está instalado
     if let Err(e) = GitRepository::ensure_git_installed() {
         error(&format!("Git error: {}", e));
         std::process::exit(1);
@@ -117,13 +134,11 @@ fn handle_git_operations(package_path: &std::path::Path, config: &config::Config
     Ok(())
 }
 
-/// Configura tracing com suporte completo a RUST_LOG
+/// Configura tracing com suporte a RUST_LOG
 fn setup_tracing(verbose: bool) {
     let filter = if verbose {
-        // --verbose força debug
         EnvFilter::new("ruslink=debug")
     } else {
-        // Permite controle via RUST_LOG (ex: RUST_LOG=debug ruslink ...)
         EnvFilter::from_default_env()
             .add_directive("ruslink=info".parse().unwrap())
     };
