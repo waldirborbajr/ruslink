@@ -42,7 +42,7 @@ warning: function `info` is never used
 
 warning: function `debug` is never used
   --> src/utils/output.rs:30:8
-```
+
    |
 30 | pub fn debug(msg: &str) {
    |        ^^^^^
@@ -50,3 +50,4 @@ warning: function `debug` is never used
 warning: `ruslink` (bin "ruslink") generated 6 warnings
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
      Running `target/debug/ruslink`
+```
