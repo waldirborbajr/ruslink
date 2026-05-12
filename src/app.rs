@@ -9,11 +9,7 @@ use crate::utils::{
 };
 
 pub fn run() -> Result<()> {
-    human_panic::setup_panic!(
-        name: "ruslink",
-        version: env!("CARGO_PKG_VERSION"),
-        authors: "Waldir Borba Junior <wborbajr@gmail.com>",
-    );
+    human_panic::setup_panic!(human_panic::metadata!());
 
     let config = parse_args();
     setup_tracing(config.verbose);
@@ -40,7 +36,7 @@ pub fn run() -> Result<()> {
     debug!("Loaded {} ignore patterns", ignore_regexes.len());
 
     // ====================== CONFIRM DESTRUCTIVE ACTIONS ======================
-    if !config.yes && !config.dry_run {
+    if !config.yes && !config.dry_run && config.is_destructive() {
         if config.delete || config.restow {
             if !confirm_action("DELETE / UNSTOW", &config) {
                 warning("Operation cancelled by user.");
