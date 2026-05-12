@@ -9,8 +9,11 @@ use crate::utils::{
 };
 
 pub fn run() -> Result<()> {
-    // Setup human-friendly panic handler
-    human_panic::setup_panic_handler();
+    human_panic::setup_panic!(
+        name: "ruslink",
+        version: env!("CARGO_PKG_VERSION"),
+        authors: "Waldir Borba Junior <wborbajr@gmail.com>",
+    );
 
     let config = parse_args();
     setup_tracing(config.verbose);

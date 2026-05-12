@@ -23,10 +23,12 @@ pub fn warning(msg: &str) {
     eprintln!("{}", msg);
 }
 
+#[allow(dead_code)]
 pub fn info(msg: &str) {
     println!("{}", msg);
 }
 
+#[allow(dead_code)]
 pub fn debug(msg: &str) {
     #[cfg(feature = "colors")]
     println!("{}", msg.dimmed());

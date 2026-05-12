@@ -32,11 +32,11 @@ pub fn confirm_action(action: &str, config: &Config) -> bool {
     }
 
     let response = input.trim().to_lowercase();
-
     matches!(response.as_str(), "y" | "yes")
 }
 
 /// Versão simplificada para confirmações genéricas
+#[allow(dead_code)]   // ← Adicionado
 pub fn confirm(message: &str, config: &Config) -> bool {
     if config.yes {
         return true;
