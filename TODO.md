@@ -1,3 +1,4 @@
+```
 cargo run
 warning: use of deprecated type alias `std::panic::PanicInfo`: use `PanicHookInfo` instead
   --> src/app.rs:12:5
@@ -41,6 +42,7 @@ warning: function `info` is never used
 
 warning: function `debug` is never used
   --> src/utils/output.rs:30:8
+```
    |
 30 | pub fn debug(msg: &str) {
    |        ^^^^^
