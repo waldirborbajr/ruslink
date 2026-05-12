@@ -1,19 +1,13 @@
-// src/app.rs
-mod cli;
-mod git;
-mod stow;
-mod utils;
-
 use anyhow::Result;
 use tracing::{debug, info, warn};
 
-use cli::parse_args;
-use cli::Config;
-use utils::confirm_action;
-use git::handle_git_operations;
-use utils::load_all_ignore_patterns;
-use utils::{success, error, warning, setup_tracing};
-use stow::{stow_package, unstow_package, StowStats};
+use crate::cli::parse_args;
+use crate::cli::Config;
+use crate::git::handle_git_operations;
+use crate::stow::{stow_package, unstow_package, StowStats};
+use crate::utils::confirm_action;
+use crate::utils::load_all_ignore_patterns;
+use crate::utils::{error, setup_tracing, success, warning};
 
 pub fn run() -> Result<()> {
     human_panic::setup_panic!();
@@ -24,7 +18,10 @@ pub fn run() -> Result<()> {
     let package_path = config.stow_dir.join(&config.package);
 
     if !package_path.exists() {
-        error(&format!("Package '{}' not found in {:?}", config.package, config.stow_dir));
+        error(&format!(
+            "Package '{}' not found in {:?}",
+            config.package, config.stow_dir
+        ));
         std::process::exit(1);
     }
 
@@ -61,7 +58,8 @@ pub fn run() -> Result<()> {
     // Unstow
     if config.restow || config.delete {
         info!("Unstowing package '{}'...", config.package);
-        let unstow_stats = unstow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
+        let unstow_stats =
+            unstow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
         total_stats.files_removed = unstow_stats.files_removed;
     }
 
@@ -84,7 +82,7 @@ pub fn run() -> Result<()> {
         warning("Dry run completed. No changes were made.");
     } else {
         success("✅ Done!");
-        
+
         if total_stats.files_linked > 0 || total_stats.files_removed > 0 {
             info!(
                 "Summary → Linked: {} | Removed: {} | Dirs: {} | Ignored: {}",
