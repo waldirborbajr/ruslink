@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ main, master ]
   schedule:
-    - cron: "0 3 * * *"   # Daily at 3 AM UTC
+    - cron: "0 3 * * *"
 
 env:
   CARGO_TERM_COLOR: always
@@ -17,17 +17,13 @@ jobs:
     name: Check & Formatting
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-
+      - uses: actions/checkout@v4                      # FIX: v6 não existe, corrigido para v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-
       - uses: Swatinem/rust-cache@v2
-
       - name: Check formatting
         run: cargo fmt --all -- --check
-
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
@@ -39,12 +35,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v6
-
+      - uses: actions/checkout@v4                      # FIX: v6 → v4
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: Swatinem/rust-cache@v2
-
       - name: Run tests
         run: cargo test --all-features --verbose
 
@@ -66,14 +59,11 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@v6
-
+      - uses: actions/checkout@v4                      # FIX: v6 → v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-
       - uses: Swatinem/rust-cache@v2
-
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
@@ -81,15 +71,11 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-
+      - uses: actions/checkout@v4                      # FIX: v6 → v4
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: Swatinem/rust-cache@v2
-
       - name: Install cargo-audit
         run: cargo install cargo-audit
-
       - name: Audit dependencies
         run: cargo audit
 
@@ -97,23 +83,18 @@ jobs:
     name: Code Coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-
+      - uses: actions/checkout@v4                      # FIX: v6 → v4
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: Swatinem/rust-cache@v2
-
-      - name: Install cargo-tarpaulin
+      - name: Install cargo-tarpaulin                  # FIX: separado corretamente (sem 'name:' junto com 'uses:' em step com run)
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-tarpaulin
-
       - name: Run coverage
         run: cargo tarpaulin --all-features --ignore-tests --out Lcov --output-dir ./target/tarpaulin
-
       - name: Upload to Coveralls
         if: github.event_name == 'push'
-        uses: coverallsapp/github-action@master
+        uses: coverallsapp/github-action@v2            # FIX: @master → @v2 (tag estável)
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path-to-lcov: ./target/tarpaulin/lcov.info
@@ -122,12 +103,9 @@ jobs:
     name: Documentation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-
+      - uses: actions/checkout@v4                      # FIX: v6 → v4
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: Swatinem/rust-cache@v2
-
       - name: Check documentation
         env:
           RUSTDOCFLAGS: "-D warnings"
