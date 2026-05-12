@@ -1,8 +1,7 @@
-// src/git/git.rs
+use anyhow::Result;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use anyhow::Result;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::cli::Config;
 
@@ -62,7 +61,10 @@ impl GitRepository {
             anyhow::bail!("Git is not installed or not found in PATH.\nPlease install Git first.");
         }
 
-        debug!("Git found: {}", String::from_utf8_lossy(&output.stdout).trim());
+        debug!(
+            "Git found: {}",
+            String::from_utf8_lossy(&output.stdout).trim()
+        );
         Ok(())
     }
 

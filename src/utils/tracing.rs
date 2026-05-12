@@ -1,12 +1,10 @@
-// src/utils/tracing.rs
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{fmt::*, EnvFilter};
 
 pub fn setup_tracing(verbose: bool) {
     let filter = if verbose {
         EnvFilter::new("ruslink=debug")
     } else {
-        EnvFilter::from_default_env()
-            .add_directive("ruslink=info".parse().unwrap())
+        EnvFilter::from_default_env().add_directive("ruslink=info".parse().unwrap())
     };
 
     fmt()

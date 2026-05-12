@@ -1,11 +1,10 @@
-// src/git/operations.rs
-use std::path::Path;
 use anyhow::Result;
-use tracing::{debug, info, warn};
+use std::path::Path;
+use tracing::{debug, info};
 
+use super::git::GitRepository;
 use crate::cli::Config;
 use crate::utils::{error, warning};
-use super::git::GitRepository;
 
 pub fn handle_git_operations(package_path: &Path, config: &Config) -> Result<()> {
     if let Err(e) = GitRepository::ensure_git_installed() {
@@ -17,7 +16,7 @@ pub fn handle_git_operations(package_path: &Path, config: &Config) -> Result<()>
 
     if config.auto_git {
         info!("Git: Checking for changes...");
-        
+
         if let Err(e) = repo.commit(config) {
             warning(&format!("Git commit warning: {}", e));
         }

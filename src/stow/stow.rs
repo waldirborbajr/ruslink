@@ -8,7 +8,7 @@ use pathdiff::diff_paths;
 use tracing::{debug, info};
 
 use crate::cli::Config;
-use crate::utils::ignore::should_ignore;
+use crate::utils::should_ignore;
 
 /// Estatísticas de execução das operações de stow/unstow
 #[derive(Debug, Default)]
@@ -181,7 +181,11 @@ fn visit_unstow(
 // ====================== HELPERS ======================
 
 fn handle_existing_destination(destination: &Path, config: &Config) -> Result<()> {
-    if destination.symlink_metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) {
+    if destination
+        .symlink_metadata()
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false)
+    {
         if !config.dry_run {
             fs::remove_file(destination)?;
         }
@@ -198,7 +202,10 @@ fn handle_existing_destination(destination: &Path, config: &Config) -> Result<()
         }
         remove_existing(destination)?;
     } else {
-        anyhow::bail!("Conflict: {:?} already exists (use --force or --adopt)", destination);
+        anyhow::bail!(
+            "Conflict: {:?} already exists (use --force or --adopt)",
+            destination
+        );
     }
     Ok(())
 }
@@ -235,7 +242,10 @@ fn is_managed_symlink(destination: &Path, source: &Path) -> bool {
         let abs_link = if link.is_absolute() {
             link
         } else {
-            destination.parent().unwrap_or_else(|| Path::new(".")).join(link)
+            destination
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join(link)
         };
         if let (Ok(a), Ok(b)) = (abs_link.canonicalize(), source.canonicalize()) {
             return a == b;
@@ -246,8 +256,14 @@ fn is_managed_symlink(destination: &Path, source: &Path) -> bool {
 
 #[cfg(unix)]
 fn create_symlink(source: &Path, destination: &Path) -> Result<()> {
-    std::os::unix::fs::symlink(source, destination)
-        .map_err(|e| anyhow::anyhow!("Failed to create symlink {} -> {}: {}", destination.display(), source.display(), e))
+    std::os::unix::fs::symlink(source, destination).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to create symlink {} -> {}: {}",
+            destination.display(),
+            source.display(),
+            e
+        )
+    })
 }
 
 #[cfg(windows)]

@@ -1,13 +1,12 @@
 use anyhow::Result;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::cli::parse_args;
-use crate::cli::Config;
 use crate::git::handle_git_operations;
 use crate::stow::{stow_package, unstow_package, StowStats};
-use crate::utils::confirm_action;
-use crate::utils::load_all_ignore_patterns;
-use crate::utils::{error, setup_tracing, success, warning};
+use crate::utils::{
+    confirm_action, error, load_all_ignore_patterns, setup_tracing, success, warning,
+};
 
 pub fn run() -> Result<()> {
     human_panic::setup_panic!();
