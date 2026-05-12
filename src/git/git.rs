@@ -47,9 +47,7 @@ pub struct GitRepository {
 
 impl GitRepository {
     pub fn new<P: AsRef<Path>>(package_path: P) -> Self {
-        Self {
-            path: package_path.as_ref().to_path_buf(),
-        }
+        Self { path: package_path.as_ref().to_path_buf() }
     }
 
     pub fn ensure_git_installed() -> Result<()> {
@@ -61,10 +59,7 @@ impl GitRepository {
             anyhow::bail!("Git is not installed or not found in PATH.\nPlease install Git first.");
         }
 
-        debug!(
-            "Git found: {}",
-            String::from_utf8_lossy(&output.stdout).trim()
-        );
+        debug!("Git found: {}", String::from_utf8_lossy(&output.stdout).trim());
         Ok(())
     }
 
@@ -97,11 +92,8 @@ impl GitRepository {
             return Ok(());
         }
 
-        let message = format!(
-            "chore({}): auto-update configuration ({})",
-            package_name,
-            get_timestamp()
-        );
+        let message =
+            format!("chore({}): auto-update configuration ({})", package_name, get_timestamp());
 
         self.git_commit(&message)?;
         Ok(())
@@ -121,11 +113,7 @@ impl GitRepository {
         self.git_add()?;
 
         let raw_message = config.commit_message.clone().unwrap_or_else(|| {
-            format!(
-                "Update {} configuration - {}",
-                config.package,
-                get_timestamp()
-            )
+            format!("Update {} configuration - {}", config.package, get_timestamp())
         });
 
         self.git_commit(&raw_message)?;
@@ -170,10 +158,7 @@ impl GitRepository {
     fn run_git(&self, args: &[&str]) -> Result<Output> {
         debug!("git {}", args.join(" "));
 
-        let output = Command::new("git")
-            .current_dir(&self.path)
-            .args(args)
-            .output()?;
+        let output = Command::new("git").current_dir(&self.path).args(args).output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
@@ -194,10 +179,7 @@ impl GitRepository {
     }
 
     fn run_git_quiet(&self, args: &[&str]) -> Result<Output> {
-        let output = Command::new("git")
-            .current_dir(&self.path)
-            .args(args)
-            .output()?;
+        let output = Command::new("git").current_dir(&self.path).args(args).output()?;
 
         if !output.status.success() {
             debug!("git {} returned non-zero (expected)", args.join(" "));

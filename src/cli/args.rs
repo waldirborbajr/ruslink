@@ -72,7 +72,8 @@ struct Args {
 pub fn parse_args() -> Config {
     let args = Args::parse();
 
-    let stow_dir = args.dir.unwrap_or_else(|| std::env::current_dir().expect("Failed to get current dir"));
+    let stow_dir =
+        args.dir.unwrap_or_else(|| std::env::current_dir().expect("Failed to get current dir"));
 
     let target_dir = args.target.unwrap_or_else(|| {
         stow_dir.parent().map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/"))
@@ -92,6 +93,6 @@ pub fn parse_args() -> Config {
         backup: args.backup,
         adopt: args.adopt,
         commit_message: args.message,
-        yes: args.yes,          // ← Novo campo
+        yes: args.yes, // ← Novo campo
     }
 }

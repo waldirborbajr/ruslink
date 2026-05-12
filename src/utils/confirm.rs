@@ -2,8 +2,8 @@
 use std::io::{self, Write};
 use tracing::debug;
 
+use super::output::{error, warning};
 use crate::cli::Config;
-use super::output::{warning, error};
 
 /// Solicita confirmação do usuário para ações destrutivas
 pub fn confirm_action(action: &str, config: &Config) -> bool {
@@ -14,7 +14,7 @@ pub fn confirm_action(action: &str, config: &Config) -> bool {
 
     println!();
     warning(&format!("⚠️  This action will {} the package '{}'", action, config.package));
-    
+
     if config.force {
         warning("   --force mode is enabled: existing files may be overwritten!");
     }
@@ -36,7 +36,7 @@ pub fn confirm_action(action: &str, config: &Config) -> bool {
 }
 
 /// Versão simplificada para confirmações genéricas
-#[allow(dead_code)]   // ← Adicionado
+#[allow(dead_code)] // ← Adicionado
 pub fn confirm(message: &str, config: &Config) -> bool {
     if config.yes {
         return true;

@@ -17,10 +17,7 @@ pub fn run() -> Result<()> {
     let package_path = config.stow_dir.join(&config.package);
 
     if !package_path.exists() {
-        error(&format!(
-            "Package '{}' not found in {:?}",
-            config.package, config.stow_dir
-        ));
+        error(&format!("Package '{}' not found in {:?}", config.package, config.stow_dir));
         std::process::exit(1);
     }
 
@@ -65,8 +62,7 @@ pub fn run() -> Result<()> {
     // Stow
     if !config.delete {
         info!("Stowing package '{}'...", config.package);
-        let stow_stats =
-            stow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
+        let stow_stats = stow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
         total_stats.files_linked = stow_stats.files_linked;
         total_stats.dirs_created = stow_stats.dirs_created;
         total_stats.files_ignored = stow_stats.files_ignored;
