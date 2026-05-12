@@ -9,7 +9,8 @@ use crate::utils::{
 };
 
 pub fn run() -> Result<()> {
-    human_panic::setup_panic!();
+    // Setup human-friendly panic handler
+    human_panic::setup_panic_handler();
 
     let config = parse_args();
     setup_tracing(config.verbose);
@@ -65,7 +66,8 @@ pub fn run() -> Result<()> {
     // Stow
     if !config.delete {
         info!("Stowing package '{}'...", config.package);
-        let stow_stats = stow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
+        let stow_stats =
+            stow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
         total_stats.files_linked = stow_stats.files_linked;
         total_stats.dirs_created = stow_stats.dirs_created;
         total_stats.files_ignored = stow_stats.files_ignored;
