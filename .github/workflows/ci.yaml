@@ -3,10 +3,18 @@ name: Rust CI
 on:
   push:
     branches: [ main, master ]
+    paths:
+      - '**.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
   pull_request:
     branches: [ main, master ]
-  schedule:
-    - cron: "0 3 * * *"
+    paths:
+      - '**.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  # schedule:
+  #   - cron: "0 3 * * *"
 
 env:
   CARGO_TERM_COLOR: always
