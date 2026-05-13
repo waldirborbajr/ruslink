@@ -24,7 +24,7 @@ jobs:
       release_upload_url: ${{ steps.create_release.outputs.upload_url }}
       release_version: ${{ steps.get_version.outputs.version }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Get release version
         id: get_version
@@ -59,7 +59,7 @@ jobs:
           - { os: macos-latest,    target: x86_64-apple-darwin }
           - { os: macos-latest,    target: aarch64-apple-darwin }
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -103,7 +103,7 @@ jobs:
           - { target: x86_64-pc-windows-msvc }
           - { target: i686-pc-windows-msvc }
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
