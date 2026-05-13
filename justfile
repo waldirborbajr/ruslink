@@ -87,7 +87,8 @@ release:
 
 # Quick linting
 lint:
-    cargo fmt --all
+    cargo fmt --all           # formata o código
+    cargo fmt --all -- --check  # valida que ficou tudo formatado
     cargo clippy --all-targets -- -D warnings
 
 # Update dependencies
