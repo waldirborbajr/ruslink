@@ -13,8 +13,8 @@ on:
       - '**.rs'
       - 'Cargo.toml'
       - 'Cargo.lock'
-  # schedule:
-  #   - cron: "0 3 * * *"
+  schedule:
+    - cron: "0 3 * * *"
 
 env:
   CARGO_TERM_COLOR: always
@@ -25,7 +25,7 @@ jobs:
     name: Check & Formatting
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4                      # FIX: v6 não existe, corrigido para v4
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -43,7 +43,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4                      # FIX: v6 → v4
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Run tests
@@ -67,7 +67,7 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@v4                      # FIX: v6 → v4
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -79,22 +79,27 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4                      # FIX: v6 → v4
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      # FIX: cargo install é lento; usar taiki-e/install-action que faz cache do binário
       - name: Install cargo-audit
-        run: cargo install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
       - name: Audit dependencies
         run: cargo audit
 
   coverage:
     name: Code Coverage
     runs-on: ubuntu-latest
+    # FIX: coverage depende de test passar — evita rodar tarpaulin em código quebrado
+    needs: test
     steps:
-      - uses: actions/checkout@v4                      # FIX: v6 → v4
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Install cargo-tarpaulin                  # FIX: separado corretamente (sem 'name:' junto com 'uses:' em step com run)
+      - name: Install cargo-tarpaulin
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-tarpaulin
@@ -102,7 +107,7 @@ jobs:
         run: cargo tarpaulin --all-features --ignore-tests --out Lcov --output-dir ./target/tarpaulin
       - name: Upload to Coveralls
         if: github.event_name == 'push'
-        uses: coverallsapp/github-action@v2            # FIX: @master → @v2 (tag estável)
+        uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path-to-lcov: ./target/tarpaulin/lcov.info
@@ -111,7 +116,7 @@ jobs:
     name: Documentation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4                      # FIX: v6 → v4
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Check documentation
