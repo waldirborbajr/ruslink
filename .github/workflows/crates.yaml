@@ -1,19 +1,20 @@
 name: Publish to crates.io
 
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_run:
+    workflows: ["Release"]   # deve ser idêntico ao 'name:' do release.yaml
+    types: [completed]
 
 jobs:
   publish:
     name: Publish to crates.io
     runs-on: ubuntu-latest
     environment: crates-io   # Opcional: bom para proteger o token
+    if: github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Melhor para versionamento
 
