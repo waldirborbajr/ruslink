@@ -4,7 +4,6 @@
 # │ Commands:                                                     │
 # │ just → show this help message                                 │
 # └───────────────────────────────────────────────────────────────┘
-
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 set dotenv-load := true
 
@@ -15,9 +14,10 @@ default: help
 help:
     @echo "Available commands for ruslink:"
     @echo ""
-    @echo " just → show this help"
-    @echo " just build / b → watch + build (default features)"
-    @echo " just run / r → watch + run"
+    @echo "=== Development ==="
+    @echo " just / just help            → show this help"
+    @echo " just build / b              → watch + build (default features)"
+    @echo " just run / r                → watch + run"
     @echo ""
     @echo "=== Feature Builds ==="
     @echo " just build-minimal          → Build without git and colors"
@@ -26,9 +26,16 @@ help:
     @echo " just build-release          → Release build (default features)"
     @echo " just build-release-minimal  → Smallest possible binary"
     @echo ""
-    @echo " just test → run tests"
-    @echo " just clean → cargo clean"
-    @echo " just release → install locally"
+    @echo "=== Quality ==="
+    @echo " just lint                   → fmt + fmt --check + clippy"
+    @echo " just test                   → run tests"
+    @echo ""
+    @echo "=== Maintenance ==="
+    @echo " just release                → build release + install locally"
+    @echo " just update                 → update deps + clear cache"
+    @echo " just cache                  → remove cargo cache"
+    @echo " just clean                  → cargo clean"
+    @echo " just size                   → show binary sizes"
     @echo ""
 
 # ─── Build & Development ─────────────────────────────────────────
@@ -87,8 +94,8 @@ release:
 
 # Quick linting
 lint:
-    cargo fmt --all           # formata o código
-    cargo fmt --all -- --check  # valida que ficou tudo formatado
+    cargo fmt --all
+    cargo fmt --all -- --check
     cargo clippy --all-targets -- -D warnings
 
 # Update dependencies
