@@ -2,44 +2,38 @@ name: Publish to crates.io
 
 on:
   workflow_run:
-    workflows: ["Release"]   # deve ser idêntico ao 'name:' do release.yaml
+    workflows: ["Release"]
     types: [completed]
 
 jobs:
   publish:
     name: Publish to crates.io
     runs-on: ubuntu-latest
-    environment: crates-io   # Opcional: bom para proteger o token
+    environment: crates-io
     if: github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Melhor para versionamento
+          fetch-depth: 0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+
+      # FIX: rustfmt e clippy removidos — o CI já valida isso antes da release
+      # Evita retrabalho desnecessário no pipeline de publicação
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Run tests
-        run: cargo test --all-features
-
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+      # FIX: testes removidos — já cobertos pelo CI antes da release chegar aqui
+      # Manter apenas o que é específico do processo de publicação
 
       - name: Dry-run publish
         run: cargo publish --dry-run
 
-      - name: Login to crates.io
-        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
-
+      # FIX: 'cargo login' expõe o token no log do runner
+      # '--token' passa direto para o publish sem logar
       - name: Publish to crates.io
-        run: cargo publish
+        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
