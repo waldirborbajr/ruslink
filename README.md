@@ -97,6 +97,29 @@ Use the `-v` or `--verbose` flag to enable debug logging:
 
 ```bash
 ruslink home --dir ~/.dotfiles --target ~ -v
+
+# Teste seguro com dry-run
+ruslink nvim --dir ~/.dotfiles --target ~ --dry-run -v
+
+# Se tudo parecer certo, execute de verdade
+ruslink nvim --dir ~/.dotfiles --target ~
+
+# Com git auto-commit
+ruslink nvim --dir ~/.dotfiles --target ~ --git --message "Setup nvim config"
+
+# Setup básico
+ruslink base --target ~
+
+# Adicionar dev tools (alguns arquivos conflitam)
+ruslink dev --target ~ --merge --merge-append \
+  --merge-extensions=".bashrc,.zshrc,.config/fish/config.fish"
+
+# Resultado:
+# ~/.bashrc contém:
+#   - Conteúdo de base/.bashrc
+#   - # === ruslink dev ===
+#   - Conteúdo de dev/.bashrc (appendido)
+#   - # === end ruslink dev ===
 ```
 
 This will show detailed information about what ruslink is doing internally, including:

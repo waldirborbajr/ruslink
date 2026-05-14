@@ -7,8 +7,9 @@ use anyhow::Result;
 use pathdiff::diff_paths;
 use tracing::{debug, info};
 
+use super::merge::{MergeAction, MergeHandler};
 use crate::cli::Config;
-use crate::utils::should_ignore;
+use crate::utils::should_ignore; // NOVO
 
 /// Estatísticas de execução das operações de stow/unstow
 #[derive(Debug, Default)]
@@ -43,11 +44,25 @@ pub fn stow_package(
     let start = Instant::now();
     info!("Stowing from {:?} → {:?}", source, target);
 
+    // NOVO: Criar MergeHandler se merge está ativado
+    let merge_handler = if config.is_merge_enabled() {
+        Some(MergeHandler::new(source, config.package.clone()))
+    } else {
+        None
+    };
+
     let mut stats = StowStats::default();
-    visit_source(source, source, target, config, ignores, &mut stats)?;
+    visit_source(source, source, target, config, ignores, &merge_handler, &mut stats)?;
 
     let elapsed = start.elapsed();
     stats.print_summary("Stow", elapsed);
+
+    // NOVO: Mostrar histórico se solicitado
+    if config.show_merge_history {
+        if let Some(handler) = &merge_handler {
+            handler.show_merge_history()?;
+        }
+    }
 
     Ok(stats)
 }
@@ -82,6 +97,7 @@ fn visit_source(
     target_base: &Path,
     config: &Config,
     ignores: &[regex::Regex],
+    merge_handler: &Option<MergeHandler>, // NOVO
     stats: &mut StowStats,
 ) -> Result<()> {
     for entry in fs::read_dir(current)? {
@@ -102,9 +118,9 @@ fn visit_source(
                 fs::create_dir_all(&destination)?;
                 stats.dirs_created += 1;
             }
-            visit_source(root, &path, target_base, config, ignores, stats)?;
+            visit_source(root, &path, target_base, config, ignores, merge_handler, stats)?;
         } else {
-            if stow_item(&path, &destination, config)? {
+            if stow_item(&path, &destination, config, merge_handler)? {
                 stats.files_linked += 1;
             }
         }
@@ -112,16 +128,61 @@ fn visit_source(
     Ok(())
 }
 
-fn stow_item(source: &Path, destination: &Path, config: &Config) -> Result<bool> {
+fn stow_item(
+    source: &Path,
+    destination: &Path,
+    config: &Config,
+    merge_handler: &Option<MergeHandler>, // NOVO
+) -> Result<bool> {
     if let Some(parent) = destination.parent() {
         if !config.dry_run {
             fs::create_dir_all(parent)?;
         }
     }
 
-    // Handle existing destination
+    // Handle existing destination - COM MERGE SUPPORT
     if destination.exists() || destination.symlink_metadata().is_ok() {
-        handle_existing_destination(destination, config)?;
+        // NOVO: Se merge está ativado, tentar resolver inteligentemente
+        if let Some(merge) = merge_handler {
+            match merge.resolve_conflict(destination, source, &config.merge_config)? {
+                MergeAction::CreateLink => {
+                    // Remover arquivo/symlink existente
+                    if !config.dry_run {
+                        fs::remove_file(destination)?;
+                    }
+                },
+                MergeAction::AppendContent => {
+                    // Fazer append de conteúdo
+                    if !config.dry_run {
+                        merge.append_content(destination, source)?;
+                    } else {
+                        info!(
+                            "DRY RUN: would append content from {:?} to {:?}",
+                            source, destination
+                        );
+                    }
+                    return Ok(true);
+                },
+                MergeAction::MergeDirectories => {
+                    // Ambos são diretórios - continuar recursão
+                    debug!("Both are directories, continuing recursion: {:?}", destination);
+                    return Ok(true);
+                },
+                MergeAction::Conflict => {
+                    // Conflito real - usar estratégia normal
+                    if !config.force && !config.adopt {
+                        anyhow::bail!(
+                            "Conflict: {:?} already exists (use --force, --adopt, or --merge-append)",
+                            destination
+                        );
+                    }
+                    handle_existing_destination(destination, config)?;
+                },
+            }
+        } else {
+            // Comportamento normal (sem merge)
+            handle_existing_destination(destination, config)?;
+        }
     }
 
     if config.dry_run {
