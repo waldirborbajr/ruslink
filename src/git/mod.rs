@@ -1,3 +1,4 @@
+// src/git/mod.rs
 mod git;
 mod operations;
 

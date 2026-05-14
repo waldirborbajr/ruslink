@@ -1,3 +1,4 @@
+// src/app.rs
 use anyhow::Result;
 use tracing::{debug, info};
 

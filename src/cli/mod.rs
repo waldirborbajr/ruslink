@@ -1,3 +1,4 @@
+// src/cli/mod.rs
 mod args;
 mod config;
 
