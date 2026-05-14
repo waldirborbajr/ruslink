@@ -5,6 +5,9 @@ on:
     workflows: ["Release"]
     types: [completed]
 
+permissions:
+  contents: read
+
 jobs:
   publish:
     name: Publish to crates.io
