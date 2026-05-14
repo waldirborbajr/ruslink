@@ -29,6 +29,8 @@ help:
     @echo "=== Quality ==="
     @echo " just lint                   → fmt + fmt --check + clippy"
     @echo " just test                   → run tests"
+    @echo " just clippy                 → run clippy with warnings denied"
+    @echo " just clippy-fix             → auto-fix clippy suggestions"
     @echo ""
     @echo "=== Maintenance ==="
     @echo " just release                → build release + install locally"
@@ -96,6 +98,14 @@ release:
 lint:
     cargo fmt --all
     cargo fmt --all -- --check
+    cargo clippy --all-targets -- -D warnings
+
+# Auto-fix clippy suggestions
+clippy-fix:
+    cargo clippy --fix --allow-dirty --allow-staged --all-targets
+
+# Run only clippy
+clippy:
     cargo clippy --all-targets -- -D warnings
 
 # Update dependencies
