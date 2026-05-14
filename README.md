@@ -1,5 +1,11 @@
 # ruslink
 
+[![CodeQL](https://github.com/waldirborbajr/ruslink/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/waldirborbajr/ruslink/actions/workflows/github-code-scanning/codeql)
+[![Publish to crates.io](https://github.com/waldirborbajr/ruslink/actions/workflows/crates.yaml/badge.svg)](https://github.com/waldirborbajr/ruslink/actions/workflows/crates.yaml)
+[![Release](https://github.com/waldirborbajr/ruslink/actions/workflows/release.yaml/badge.svg)](https://github.com/waldirborbajr/ruslink/actions/workflows/release.yaml)
+[![Rust CI](https://github.com/waldirborbajr/ruslink/actions/workflows/ci.yaml/badge.svg)](https://github.com/waldirborbajr/ruslink/actions/workflows/ci.yaml)
+
+
 `ruslink` is a lightweight Rust-based stow utility for managing dotfiles and package-style deployments with support for ignore patterns, dry-run mode, auto git commit, force overwrite, backup, and friendly error messages.
 
 ## Features
