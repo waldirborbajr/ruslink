@@ -26,11 +26,28 @@ cargo build --release
 Build with just
 
 ```bash
-just build                  # build normal (git + colors)
-just build-minimal          # build bem leve
-just build-release-minimal  # release mínimo
-just build-no-git
-just size                   # ver tamanho do binário
+=== Development ===
+ just / just help            → show this help
+ just build / b              → watch + build (default features)
+ just run / r                → watch + run
+
+=== Feature Builds ===
+ just build-minimal          → Build without git and colors
+ just build-no-git           → Build with colors but no git
+ just build-no-colors        → Build with git but no colors
+ just build-release          → Release build (default features)
+ just build-release-minimal  → Smallest possible binary
+
+=== Quality ===
+ just lint                   → fmt + fmt --check + clippy
+ just test                   → run tests
+
+=== Maintenance ===
+ just release                → build release + install locally
+ just update                 → update deps + clear cache
+ just cache                  → remove cargo cache
+ just clean                  → cargo clean
+ just size                   → show binary sizes
 ```
 
 The binary will be available at `target/release/ruslink`.
