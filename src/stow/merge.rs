@@ -192,11 +192,11 @@ impl MergeHandler {
                 println!("\n📋 Merge History ({}):", self.track_file.display());
                 println!("{}", log);
                 Ok(())
-            }
+            },
             Err(e) => {
                 warn!("No merge history found: {}", e);
                 Ok(())
-            }
+            },
         }
     }
 }

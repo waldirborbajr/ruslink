@@ -1,5 +1,5 @@
 // src/utils/tracing.rs
-use tracing_subscriber::{fmt::*, EnvFilter};
+use tracing_subscriber::{fmt::fmt, EnvFilter};
 
 pub fn setup_tracing(verbose: bool) {
     let filter = if verbose {

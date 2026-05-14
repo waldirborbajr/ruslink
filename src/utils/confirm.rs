@@ -27,7 +27,7 @@ pub fn confirm_action(action: &str, config: &Config) -> bool {
 
     let mut input = String::new();
     if let Err(e) = io::stdin().read_line(&mut input) {
-        error(&format!("Failed to read user input: {}", e));
+        error(&format!("Failed to read user input: {e}"));
         return false;
     }
 

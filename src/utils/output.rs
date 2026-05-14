@@ -1,6 +1,6 @@
 // src/utils/output.rs
 #[cfg(feature = "colors")]
-use colored::*;
+use colored::Colorize;
 
 pub fn success(msg: &str) {
     #[cfg(feature = "colors")]
@@ -25,7 +25,7 @@ pub fn warning(msg: &str) {
 
 #[allow(dead_code)]
 pub fn info(msg: &str) {
-    println!("{}", msg);
+    println!("{msg}");
 }
 
 #[allow(dead_code)]

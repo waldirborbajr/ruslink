@@ -51,7 +51,7 @@ fn load_gitignore(base: &Path) -> Option<Vec<Regex>> {
 
     let mut regexes = Vec::new();
     if let Ok(file) = std::fs::File::open(path) {
-        for line in std::io::BufRead::lines(std::io::BufReader::new(file)).flatten() {
+        for line in std::io::BufRead::lines(std::io::BufReader::new(file)).map_while(Result::ok) {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
                 continue;
@@ -72,7 +72,7 @@ fn load_ruslink_ignore(base: &Path) -> Option<Vec<Regex>> {
 
     let mut regexes = Vec::new();
     if let Ok(file) = std::fs::File::open(path) {
-        for line in std::io::BufRead::lines(std::io::BufReader::new(file)).flatten() {
+        for line in std::io::BufRead::lines(std::io::BufReader::new(file)).map_while(Result::ok) {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
                 continue;
@@ -93,13 +93,13 @@ fn load_ruslink_ignore(base: &Path) -> Option<Vec<Regex>> {
 fn git_pattern_to_regex(pattern: &str) -> Option<Regex> {
     let p = pattern.trim_start_matches('/').trim_end_matches('/');
     let re_str = p.replace('.', r"\.").replace('*', ".*").replace('?', ".");
-    let final_re = format!(r"(^|/).*{}(/|$)", re_str);
+    let final_re = format!(r"(^|/).*{re_str}(/|$)");
     Regex::new(&final_re).ok()
 }
 
 fn glob_to_regex(p: &str) -> String {
     let re = p.replace('.', r"\.").replace('*', ".*").replace('?', ".");
-    format!("^.*{}$", re)
+    format!("^.*{re}$")
 }
 
 /// Verifica se um caminho deve ser ignorado
