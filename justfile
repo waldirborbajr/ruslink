@@ -4,13 +4,15 @@
 # │ Commands:                                                     │
 # │ just → show this help message                                 │
 # └───────────────────────────────────────────────────────────────┘
+
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 set dotenv-load := true
 
 # Default recipe
 default: help
 
-# Show this help message
+# ─── Help ──────────────────────────────────────────────────────
+
 help:
     @echo "Available commands for ruslink:"
     @echo ""
@@ -27,8 +29,13 @@ help:
     @echo " just build-release-minimal  → Smallest possible binary"
     @echo ""
     @echo "=== Quality ==="
-    @echo " just lint                   → fmt + fmt --check + clippy"
+    @echo " just fmt                    → format code"
+    @echo " just fmt-check              → check formatting"
+    @echo " just lint                   → fmt-check + clippy"
+    @echo " just clippy                 → run clippy with warnings denied"
+    @echo " just clippy-fix             → auto-fix clippy suggestions"
     @echo " just test                   → run tests"
+    @echo " just check                  → cargo check"
     @echo ""
     @echo "=== Maintenance ==="
     @echo " just release                → build release + install locally"
@@ -38,7 +45,7 @@ help:
     @echo " just size                   → show binary sizes"
     @echo ""
 
-# ─── Build & Development ─────────────────────────────────────────
+# ─── Build & Development ───────────────────────────────────────
 
 # Watch + build (default features: git + colors)
 build:
@@ -52,7 +59,7 @@ run:
 b: build
 r: run
 
-# ─── Feature Builds ─────────────────────────────────────────────
+# ─── Feature Builds ────────────────────────────────────────────
 
 # Build minimal (smallest binary - no git, no colors)
 build-minimal:
@@ -73,11 +80,36 @@ build-release:
 build-release-minimal:
     cargo build --release --no-default-features --features minimal
 
-# ─── Other Commands ─────────────────────────────────────────────
+# ─── Quality ───────────────────────────────────────────────────
+
+# Format all code
+fmt:
+    cargo fmt --all
+
+# Check formatting without modifying files
+fmt-check:
+    cargo fmt --all -- --check
+
+# Fast compile validation
+check:
+    cargo check --all-targets --all-features
 
 # Run tests
 test:
-    cargo test -- --nocapture
+    cargo test --all-features -- --nocapture
+
+# Run clippy with strict settings
+clippy:
+    cargo clippy --all-targets --all-features -- -D warnings
+
+# Auto-fix clippy suggestions
+clippy-fix:
+    cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features
+
+# Full lint pipeline
+lint: fmt-check clippy
+
+# ─── Maintenance ───────────────────────────────────────────────
 
 # Clean build artifacts
 clean:
@@ -92,18 +124,12 @@ release:
     cargo build --release
     cargo install --path . --locked
 
-# Quick linting
-lint:
-    cargo fmt --all
-    cargo fmt --all -- --check
-    cargo clippy --all-targets -- -D warnings
-
 # Update dependencies
 update:
     cargo update
     just cache
 
-# Size check (useful after minimal builds)
+# Show binary sizes
 size:
     @echo "Binary sizes:"
     @ls -lh target/release/ruslink 2>/dev/null || echo "Release binary not found"

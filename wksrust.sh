@@ -5,3 +5,4 @@ source "$HOME/.cargo/env"
 source "$HOME/.cargo/.bashrc"
 source "$HOME/.cargo/.zshrc"
 cargo install just
+rustup component add clippy
