@@ -1,4 +1,3 @@
-// src/stow/stow.rs
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -9,9 +8,8 @@ use tracing::{debug, info};
 
 use super::merge::{MergeAction, MergeHandler};
 use crate::cli::Config;
-use crate::utils::should_ignore; // NOVO
+use crate::utils::should_ignore;
 
-/// Estatísticas de execução das operações de stow/unstow
 #[derive(Debug, Default)]
 pub struct StowStats {
     pub files_linked: usize,
@@ -24,7 +22,11 @@ impl StowStats {
     pub fn print_summary(&self, operation: &str, elapsed: std::time::Duration) {
         info!(
             "✅ {} completed: {} files | {} dirs | {} ignored | {:.2?}",
-            operation, self.files_linked, self.dirs_created, self.files_ignored, elapsed
+            operation,
+            self.files_linked,
+            self.dirs_created,
+            self.files_ignored,
+            elapsed
         );
     }
 }
@@ -44,7 +46,6 @@ pub fn stow_package(
     let start = Instant::now();
     info!("Stowing from {:?} → {:?}", source, target);
 
-    // NOVO: Criar MergeHandler se merge está ativado
     let merge_handler = if config.is_merge_enabled() {
         Some(MergeHandler::new(source, config.package.clone()))
     } else {
@@ -52,12 +53,20 @@ pub fn stow_package(
     };
 
     let mut stats = StowStats::default();
-    visit_source(source, source, target, config, ignores, &merge_handler, &mut stats)?;
+
+    visit_source(
+        source,
+        source,
+        target,
+        config,
+        ignores,
+        &merge_handler,
+        &mut stats,
+    )?;
 
     let elapsed = start.elapsed();
     stats.print_summary("Stow", elapsed);
 
-    // NOVO: Mostrar histórico se solicitado
     if config.show_merge_history {
         if let Some(handler) = &merge_handler {
             handler.show_merge_history()?;
@@ -81,7 +90,15 @@ pub fn unstow_package(
     info!("Unstowing from {:?} → {:?}", source, target);
 
     let mut stats = StowStats::default();
-    visit_unstow(source, source, target, config, ignores, &mut stats)?;
+
+    visit_unstow(
+        source,
+        source,
+        target,
+        config,
+        ignores,
+        &mut stats,
+    )?;
 
     let elapsed = start.elapsed();
     stats.print_summary("Unstow", elapsed);
@@ -97,7 +114,7 @@ fn visit_source(
     target_base: &Path,
     config: &Config,
     ignores: &[regex::Regex],
-    merge_handler: &Option<MergeHandler>, // NOVO
+    merge_handler: &Option<MergeHandler>,
     stats: &mut StowStats,
 ) -> Result<()> {
     for entry in fs::read_dir(current)? {
@@ -118,13 +135,21 @@ fn visit_source(
                 fs::create_dir_all(&destination)?;
                 stats.dirs_created += 1;
             }
-            visit_source(root, &path, target_base, config, ignores, merge_handler, stats)?;
-        } else {
-            if stow_item(&path, &destination, config, merge_handler)? {
-                stats.files_linked += 1;
-            }
+
+            visit_source(
+                root,
+                &path,
+                target_base,
+                config,
+                ignores,
+                merge_handler,
+                stats,
+            )?;
+        } else if stow_item(&path, &destination, config, merge_handler)? {
+            stats.files_linked += 1;
         }
     }
+
     Ok(())
 }
 
@@ -132,7 +157,7 @@ fn stow_item(
     source: &Path,
     destination: &Path,
     config: &Config,
-    merge_handler: &Option<MergeHandler>, // NOVO
+    merge_handler: &Option<MergeHandler>,
 ) -> Result<bool> {
     if let Some(parent) = destination.parent() {
         if !config.dry_run {
@@ -140,47 +165,55 @@ fn stow_item(
         }
     }
 
-    // Handle existing destination - COM MERGE SUPPORT
     if destination.exists() || destination.symlink_metadata().is_ok() {
-        // NOVO: Se merge está ativado, tentar resolver inteligentemente
         if let Some(merge) = merge_handler {
             match merge.resolve_conflict(destination, source, &config.merge_config)? {
                 MergeAction::CreateLink => {
-                    // Remover arquivo/symlink existente
                     if !config.dry_run {
-                        fs::remove_file(destination)?;
+                        remove_existing(destination)?;
                     }
-                },
+                }
+
                 MergeAction::AppendContent => {
-                    // Fazer append de conteúdo
                     if !config.dry_run {
-                        merge.append_content(destination, source)?;
+                        merge.append_content(
+                            destination,
+                            source,
+                            &config.merge_config,
+                        )?;
                     } else {
                         info!(
                             "DRY RUN: would append content from {:?} to {:?}",
-                            source, destination
-                        );
-                    }
-                    return Ok(true);
-                },
-                MergeAction::MergeDirectories => {
-                    // Ambos são diretórios - continuar recursão
-                    debug!("Both are directories, continuing recursion: {:?}", destination);
-                    return Ok(true);
-                },
-                MergeAction::Conflict => {
-                    // Conflito real - usar estratégia normal
-                    if !config.force && !config.adopt {
-                        anyhow::bail!(
-                            "Conflict: {:?} already exists (use --force, --adopt, or --merge-append)",
+                            source,
                             destination
                         );
                     }
+
+                    return Ok(true);
+                }
+
+                MergeAction::MergeDirectories => {
+                    debug!(
+                        "Both are directories, continuing recursion: {:?}",
+                        destination
+                    );
+
+                    return Ok(true);
+                }
+
+                MergeAction::Conflict => {
+                    if !config.force && !config.adopt {
+                        anyhow::bail!(
+                            "Conflict: {:?} already exists \
+(use --force, --adopt or --merge)",
+                            destination
+                        );
+                    }
+
                     handle_existing_destination(destination, config)?;
-                },
+                }
             }
         } else {
-            // Comportamento normal (sem merge)
             handle_existing_destination(destination, config)?;
         }
     }
@@ -191,9 +224,11 @@ fn stow_item(
     }
 
     let relative = make_relative(source, destination);
+
     create_symlink(&relative, destination)?;
 
     info!("Linked: {:?} → {:?}", destination, relative);
+
     Ok(true)
 }
 
@@ -219,7 +254,15 @@ fn visit_unstow(
         let destination = target_base.join(rel_path);
 
         if entry.file_type()?.is_dir() {
-            visit_unstow(root, &path, target_base, config, ignores, stats)?;
+            visit_unstow(
+                root,
+                &path,
+                target_base,
+                config,
+                ignores,
+                stats,
+            )?;
+
             if !config.dry_run && destination.exists() {
                 let _ = fs::remove_dir(&destination);
             }
@@ -227,6 +270,7 @@ fn visit_unstow(
             if config.backup {
                 backup_existing(&destination)?;
             }
+
             if config.dry_run {
                 info!("DRY RUN: would remove {:?}", destination);
             } else {
@@ -236,20 +280,28 @@ fn visit_unstow(
             }
         }
     }
+
     Ok(())
 }
 
 // ====================== HELPERS ======================
 
-fn handle_existing_destination(destination: &Path, config: &Config) -> Result<()> {
-    if destination.symlink_metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) {
+fn handle_existing_destination(
+    destination: &Path,
+    config: &Config,
+) -> Result<()> {
+    if destination
+        .symlink_metadata()
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false)
+    {
         if !config.dry_run {
             fs::remove_file(destination)?;
         }
+
         return Ok(());
     }
 
-    // Real file or directory exists
     if config.adopt {
         debug!("Adopting existing file: {:?}", destination);
         remove_existing(destination)?;
@@ -257,37 +309,52 @@ fn handle_existing_destination(destination: &Path, config: &Config) -> Result<()
         if config.backup {
             backup_existing(destination)?;
         }
+
         remove_existing(destination)?;
     } else {
-        anyhow::bail!("Conflict: {:?} already exists (use --force or --adopt)", destination);
+        anyhow::bail!(
+            "Conflict: {:?} already exists \
+(use --force or --adopt)",
+            destination
+        );
     }
+
     Ok(())
 }
 
 fn make_relative(source: &Path, destination: &Path) -> PathBuf {
-    diff_paths(source, destination.parent().unwrap_or(destination))
-        .unwrap_or_else(|| source.to_path_buf())
+    diff_paths(
+        source,
+        destination.parent().unwrap_or(destination),
+    )
+    .unwrap_or_else(|| source.to_path_buf())
 }
 
 fn backup_existing(path: &Path) -> Result<()> {
     let mut backup = path.with_extension("bak");
     let mut counter = 1;
+
     while backup.exists() {
         backup = path.with_extension(format!("bak{}", counter));
         counter += 1;
     }
+
     fs::rename(path, &backup)?;
+
     info!("Backed up: {:?} → {:?}", path, backup);
+
     Ok(())
 }
 
 fn remove_existing(path: &Path) -> Result<()> {
     let meta = path.symlink_metadata()?;
+
     if meta.is_dir() && !meta.file_type().is_symlink() {
         fs::remove_dir_all(path)?;
     } else {
         fs::remove_file(path)?;
     }
+
     Ok(())
 }
 
@@ -296,12 +363,19 @@ fn is_managed_symlink(destination: &Path, source: &Path) -> bool {
         let abs_link = if link.is_absolute() {
             link
         } else {
-            destination.parent().unwrap_or_else(|| Path::new(".")).join(link)
+            destination
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join(link)
         };
-        if let (Ok(a), Ok(b)) = (abs_link.canonicalize(), source.canonicalize()) {
+
+        if let (Ok(a), Ok(b)) =
+            (abs_link.canonicalize(), source.canonicalize())
+        {
             return a == b;
         }
     }
+
     false
 }
 
@@ -324,5 +398,12 @@ fn create_symlink(source: &Path, destination: &Path) -> Result<()> {
     } else {
         std::os::windows::fs::symlink_file(source, destination)
     }
-    .map_err(|e| anyhow::anyhow!("Failed to create symlink on Windows: {}", e))
+    .map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to create symlink {} -> {}: {}",
+            destination.display(),
+            source.display(),
+            e
+        )
+    })
 }
