@@ -170,12 +170,19 @@ impl MergeHandler {
         }
 
         // Se destination é symlink apontando para source, OK
-        if let Ok(link) = fs::read_link(destination) {
-            if link == source || link.canonicalize() == source.canonicalize() {
-                debug!("Symlink already correct: {:?}", destination);
-                return Ok(MergeAction::CreateLink);
-            }
-        }
+if let Ok(link) = fs::read_link(destination) {
+    let same_path = link == source;
+
+    let same_canonical = match (link.canonicalize(), source.canonicalize()) {
+        (Ok(link_path), Ok(source_path)) => link_path == source_path,
+        _ => false,
+    };
+
+    if same_path || same_canonical {
+        debug!("Symlink already correct: {:?}", destination);
+        return Ok(MergeAction::CreateLink);
+    }
+}
 
         // Verificar se é uma extensão que pode ser appendida
         if self.should_append(destination, config) {
