@@ -103,7 +103,7 @@ pub fn parse_args() -> Config {
 
     // ====================== NOVO: PARSE MERGE CONFIG ======================
 
-    let mut merge_config = crate::stow::merge::MergeConfig::default();
+    let mut merge_config = crate::stow::MergeConfig::default();
 
     if args.merge || args.merge_append {
         merge_config.enabled = true;

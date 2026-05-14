@@ -1,0 +1,14 @@
+# clippy.toml
+warn = [
+    "clippy::pedantic",
+    "clippy::nursery"
+]
+
+# Ignorar algumas regras pedantes específicas
+allow = [
+    "clippy::module_name_repetitions",
+    "clippy::missing_errors_doc"
+]
+
+# Habilitar sugestões de estilo (útil para CI)
+clippy::cargo = true
