@@ -16,14 +16,14 @@ on:
       - "**/Cargo.lock"
       - ".github/workflows/security-audit.yml"
 
-  # Daily check (recommended)
+  # Daily automatic check (recommended)
   # schedule:
-  #   - cron: '0 3 * * *'  # Every day at 03:00 UTC
+  #   - cron: '0 3 * * *'   # Every day at 03:00 UTC
 
 permissions:
   contents: read
-  issues: write      # To create issues when vulnerabilities are found
-  checks: write      # To report check status on PRs
+  issues: write      # Required to create issues on vulnerabilities
+  checks: write
 
 env:
   CARGO_TERM_COLOR: always
@@ -49,10 +49,10 @@ jobs:
         with:
           shared-key: security-audit
 
-      - name: Install cargo-audit and cargo-deny
+      - name: Install cargo-audit
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-audit,cargo-deny
+          tool: cargo-audit
 
       # ==================== cargo audit ====================
       - name: Audit dependencies (cargo-audit)
@@ -60,10 +60,13 @@ jobs:
         continue-on-error: true
         id: audit
 
-      # ==================== cargo deny ====================
+      # ==================== cargo deny (using official action) ====================
       - name: Check with cargo-deny
-        run: cargo deny --all-features check
-        continue-on-error: false
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --all-features
+          # log-level: warn        # Optional: change to 'error' if you want stricter output
 
       # ==================== Report Issues ====================
       - name: Create Issue on vulnerability
