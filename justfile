@@ -1,8 +1,7 @@
 # ┌───────────────────────────────────────────────────────────────┐
 # │ Justfile for ruslink                                          │
 # │                                                               │
-# │ Commands:                                                     │
-# │ just → show this help message                                 │
+# │ Commands: just → show this help message                       │
 # └───────────────────────────────────────────────────────────────┘
 
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
@@ -12,41 +11,42 @@ set dotenv-load := true
 default: help
 
 # ─── Help ──────────────────────────────────────────────────────
-
 help:
     @echo "Available commands for ruslink:"
     @echo ""
     @echo "=== Development ==="
-    @echo " just / just help            → show this help"
-    @echo " just build / b              → watch + build (default features)"
-    @echo " just run / r                → watch + run"
+    @echo " just / just help          → Show this help message"
+    @echo " just build / b            → Watch + build (default features)"
+    @echo " just run / r              → Watch + run"
     @echo ""
     @echo "=== Feature Builds ==="
-    @echo " just build-minimal          → Build without git and colors"
-    @echo " just build-no-git           → Build with colors but no git"
-    @echo " just build-no-colors        → Build with git but no colors"
-    @echo " just build-release          → Release build (default features)"
-    @echo " just build-release-minimal  → Smallest possible binary"
+    @echo " just build-minimal        → Build without git and colors"
+    @echo " just build-no-git         → Build with colors but no git"
+    @echo " just build-no-colors      → Build with git but no colors"
+    @echo " just build-release        → Release build (default features)"
+    @echo " just build-release-minimal→ Smallest possible binary"
     @echo ""
     @echo "=== Quality ==="
-    @echo " just fmt                    → format code"
-    @echo " just fmt-check              → check formatting"
-    @echo " just lint                   → fmt-check + clippy"
-    @echo " just clippy                 → run clippy with warnings denied"
-    @echo " just clippy-fix             → auto-fix clippy suggestions"
-    @echo " just test                   → run tests"
-    @echo " just check                  → cargo check"
+    @echo " just fmt                  → Format code"
+    @echo " just fmt-check            → Check formatting"
+    @echo " just lint                 → fmt-check + clippy"
+    @echo " just clippy               → Run clippy (warnings denied)"
+    @echo " just clippy-fix           → Auto-fix clippy suggestions"
+    @echo " just test                 → Run tests"
+    @echo " just check                → Cargo check"
     @echo ""
     @echo "=== Maintenance ==="
-    @echo " just release                → build release + install locally"
-    @echo " just update                 → update deps + clear cache"
-    @echo " just cache                  → remove cargo cache"
-    @echo " just clean                  → cargo clean"
-    @echo " just size                   → show binary sizes"
+    @echo " just update               → Update dependencies + Cargo.lock"
+    @echo " just pre-commit           → Full preparation before commit (recommended)"
+    @echo " just check-lock           → Verify Cargo.lock consistency"
+    @echo " just build-release-strict → Build with --locked (CI-like)"
+    @echo " just release              → Build + install locally"
+    @echo " just clean                → Clean build artifacts"
+    @echo " just cache                → Clear cargo cache"
+    @echo " just size                 → Show binary sizes"
     @echo ""
 
 # ─── Build & Development ───────────────────────────────────────
-
 # Watch + build (default features: git + colors)
 build:
     cargo watch -c -w src/ -x "build --color=always"
@@ -60,20 +60,15 @@ b: build
 r: run
 
 # ─── Feature Builds ────────────────────────────────────────────
-
-# Build minimal (smallest binary - no git, no colors)
 build-minimal:
     cargo build --no-default-features --features minimal
 
-# Build with colors but without git support
 build-no-git:
     cargo build --no-default-features --features colors
 
-# Build with git but without colors
 build-no-colors:
     cargo build --no-default-features --features git
 
-# Release builds
 build-release:
     cargo build --release
 
@@ -81,53 +76,66 @@ build-release-minimal:
     cargo build --release --no-default-features --features minimal
 
 # ─── Quality ───────────────────────────────────────────────────
-
-# Format all code
 fmt:
     cargo fmt --all
 
-# Check formatting without modifying files
 fmt-check:
     cargo fmt --all -- --check
 
-# Fast compile validation
 check:
     cargo check --all-targets --all-features
 
-# Run tests
 test:
     cargo test --all-features -- --nocapture
 
-# Run clippy with strict settings
 clippy:
     cargo clippy --all-targets --all-features -- -D warnings
 
-# Auto-fix clippy suggestions
 clippy-fix:
     cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features
 
-# Full lint pipeline
 lint: fmt-check clippy
 
 # ─── Maintenance ───────────────────────────────────────────────
+
+# Update dependencies and Cargo.lock
+update:
+    cargo update
+    just cache
+    @echo "✅ Dependencies updated and Cargo.lock regenerated!"
+    @echo "💡 Don't forget to commit the lockfile:"
+    @echo "   git add Cargo.lock && git commit -m 'chore: update Cargo.lock'"
+
+# Full preparation before committing (recommended)
+pre-commit:
+    just fmt
+    just lint
+    just update
+    just check-lock
+    @echo "🎉 Pre-commit checks completed! Ready to commit."
+
+# Verify Cargo.lock is consistent with Cargo.toml
+check-lock:
+    cargo check --locked
+    @echo "✅ Cargo.lock is consistent with Cargo.toml"
+
+# Build with strict locked mode (same as CI)
+build-release-strict:
+    cargo build --release --locked
+    @echo "✅ Release build with --locked completed successfully!"
 
 # Clean build artifacts
 clean:
     cargo clean
 
-# Remove cargo cache
+# Clear cargo cache
 cache:
-    cargo-cache --remove-dir all || echo "cargo-cache not installed"
+    cargo-cache --remove-dir all || echo "cargo-cache not installed (optional tool)"
 
-# Build and install release version locally
+# Build and install locally
 release:
-    cargo build --release
+    just build-release-strict
     cargo install --path . --locked
-
-# Update dependencies
-update:
-    cargo update
-    just cache
 
 # Show binary sizes
 size:
