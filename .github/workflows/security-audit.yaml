@@ -14,11 +14,11 @@ on:
     paths:
       - "**/Cargo.toml"
       - "**/Cargo.lock"
-      - ".github/workflows/security-audit.yml"
+      - ".github/workflows/security-audit.yaml"
 
   # Verificação diária automática (boa prática)
-  schedule:
-    - cron: '0 3 * * *'  # todo dia às 03:00 UTC
+  # schedule:
+  #   - cron: '0 3 * * *'  # todo dia às 03:00 UTC
 
 permissions:
   contents: read
