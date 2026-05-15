@@ -1,5 +1,7 @@
 // src/cli/config.rs
 
+#![allow(clippy::struct_excessive_bools)]
+
 use std::path::PathBuf;
 
 use crate::stow::MergeConfig;
@@ -35,8 +37,8 @@ pub struct Config {
     /// Enable merge mode
     pub merge: bool,
 
-    /// Merge configuration
-    pub merge_config: MergeConfig,
+    /// Merge settings
+    pub merge_settings: MergeConfig,
 
     /// Show merge history
     pub show_merge_history: bool,
@@ -52,6 +54,6 @@ impl Config {
     /// Returns true if merge mode is enabled.
     #[must_use]
     pub const fn is_merge_enabled(&self) -> bool {
-        self.merge && self.merge_config.enabled
+        self.merge && self.merge_settings.enabled
     }
 }

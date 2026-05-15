@@ -1,3 +1,5 @@
+// src/stow/stowmanager.rs
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -147,7 +149,7 @@ fn stow_item(
 
     if destination.exists() || destination.symlink_metadata().is_ok() {
         if let Some(merge) = merge_handler {
-            match merge.resolve_conflict(destination, source, &config.merge_config) {
+            match merge.resolve_conflict(destination, source, &config.merge_settings) {
                 MergeAction::CreateLink => {
                     if !config.dry_run {
                         remove_existing(destination)?;
@@ -162,7 +164,7 @@ fn stow_item(
                             destination.display()
                         );
                     } else {
-                        merge.append_content(destination, source, &config.merge_config)?;
+                        merge.append_content(destination, source, &config.merge_settings)?;
                     }
 
                     return Ok(true);
@@ -297,7 +299,6 @@ fn backup_existing(path: &Path) -> Result<()> {
 
     while backup.exists() {
         backup = path.with_extension(format!("bak{counter}"));
-
         counter += 1;
     }
 

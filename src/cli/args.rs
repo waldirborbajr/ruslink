@@ -1,5 +1,3 @@
-// src/cli/args.rs
-
 #![allow(clippy::struct_excessive_bools)]
 
 use clap::Parser;
@@ -16,7 +14,7 @@ use super::config::Config;
   ruslink nvim --restow --force
   ruslink nvim --dry-run -v
 
-MERGE MODE (múltiplos packages):
+MERGE MODE:
   ruslink base --target ~
   ruslink dev --target ~ --merge --merge-append
   ruslink gui --target ~ --merge --merge-append --merge-extensions .bashrc,.zshrc")]
@@ -24,11 +22,11 @@ struct Args {
     /// Package name to manage
     package: String,
 
-    /// Stow directory (default: current directory)
+    /// Stow directory
     #[arg(short = 'd', long)]
     dir: Option<PathBuf>,
 
-    /// Target directory (default: parent of stow dir)
+    /// Target directory
     #[arg(short = 't', long)]
     target: Option<PathBuf>,
 
@@ -36,11 +34,11 @@ struct Args {
     #[arg(short = 'D', long)]
     delete: bool,
 
-    /// Restow (unstow then stow)
+    /// Restow
     #[arg(short = 'R', long)]
     restow: bool,
 
-    /// Dry run (simulate only)
+    /// Dry run
     #[arg(short = 'n', long)]
     dry_run: bool,
 
@@ -48,50 +46,47 @@ struct Args {
     #[arg(short, long)]
     verbose: bool,
 
-    /// Enable git integration (commit changes)
+    /// Enable git integration
     #[arg(short, long)]
     git: bool,
 
-    /// Push to remote after commit
+    /// Push after commit
     #[arg(long)]
     git_push: bool,
 
-    /// Force overwrite existing files
+    /// Force overwrite
     #[arg(long)]
     force: bool,
 
-    /// Create backup before overwriting
+    /// Backup existing files
     #[arg(long)]
     backup: bool,
 
-    /// Adopt existing files (replace with symlink)
+    /// Adopt existing files
     #[arg(long)]
     adopt: bool,
 
-    /// Custom commit message
+    /// Commit message
     #[arg(short = 'm', long)]
     message: Option<String>,
 
-    /// Automatically answer yes to all prompts
+    /// Auto-confirm prompts
     #[arg(short = 'y', long = "yes")]
     yes: bool,
 
-    // ======================
-    // MERGE MODE
-    // ======================
     /// Enable merge mode
     #[arg(long)]
     merge: bool,
 
-    /// Append content instead of conflicting
+    /// Append mergeable files
     #[arg(long)]
     merge_append: bool,
 
-    /// File extensions to auto-append
+    /// Merge extensions
     #[arg(long)]
     merge_extensions: Option<String>,
 
-    /// Show merge history and exit
+    /// Show merge history
     #[arg(long)]
     show_merge_history: bool,
 }
@@ -106,55 +101,39 @@ pub fn parse_args() -> Config {
         .target
         .unwrap_or_else(|| stow_dir.parent().map_or_else(|| PathBuf::from("/"), PathBuf::from));
 
-    // ======================
-    // MERGE CONFIG
-    // ======================
-
-    let mut merge_config = crate::stow::MergeConfig::default();
+    let mut merge_settings = crate::stow::MergeConfig::default();
 
     if args.merge || args.merge_append {
-        merge_config.enabled = true;
+        merge_settings.enabled = true;
     }
 
     if let Some(exts) = args.merge_extensions {
-        merge_config.append_extensions = exts.split(',').map(|e| e.trim().to_string()).collect();
+        merge_settings.append_extensions = exts.split(',').map(|e| e.trim().to_string()).collect();
     }
 
     Config {
         package: args.package,
-
         stow_dir,
-
         target_dir,
 
         delete: args.delete,
-
         restow: args.restow,
-
         dry_run: args.dry_run,
 
         verbose: args.verbose,
 
         auto_git: args.git,
-
         git_push: args.git_push,
+        commit_message: args.message,
 
         force: args.force,
-
         backup: args.backup,
-
         adopt: args.adopt,
-
-        commit_message: args.message,
 
         yes: args.yes,
 
-        // ======================
-        // MERGE
-        // ======================
         merge: args.merge || args.merge_append,
-
-        merge_config,
+        merge_settings,
 
         show_merge_history: args.show_merge_history,
     }
