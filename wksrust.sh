@@ -1,5 +1,5 @@
-# install Rust into github woorkspace
-#
+# Install Rust & Tools into github workspace, just for development & testing, not for production use
+# 
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"
 source "$HOME/.cargo/.bashrc"
