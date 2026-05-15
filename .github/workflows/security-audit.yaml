@@ -7,23 +7,23 @@ on:
       - "**/Cargo.toml"
       - "**/Cargo.lock"
       - ".github/workflows/security-audit.yml"
-      - ".github/workflows/rust-ci.yaml"  # opcional: se quiser que mudança no CI dispare
+      - ".github/workflows/rust-ci.yaml"
 
   pull_request:
     branches: [main, master]
     paths:
       - "**/Cargo.toml"
       - "**/Cargo.lock"
-      - ".github/workflows/security-audit.yaml"
+      - ".github/workflows/security-audit.yml"
 
-  # Verificação diária automática (boa prática)
+  # Daily check (recommended)
   # schedule:
-  #   - cron: '0 3 * * *'  # todo dia às 03:00 UTC
+  #   - cron: '0 3 * * *'  # Every day at 03:00 UTC
 
 permissions:
   contents: read
-  issues: write        # para criar issues em caso de vulnerabilidades
-  checks: write        # para relatar status no PR
+  issues: write      # To create issues when vulnerabilities are found
+  checks: write      # To report check status on PRs
 
 env:
   CARGO_TERM_COLOR: always
@@ -57,12 +57,12 @@ jobs:
       # ==================== cargo audit ====================
       - name: Audit dependencies (cargo-audit)
         run: cargo audit --all-features --ignore-until 2026-12-31
-        continue-on-error: true  # Não quebrar CI por advisory novo (pode ser falso positivo temporário)
+        continue-on-error: true
         id: audit
 
       # ==================== cargo deny ====================
       - name: Check with cargo-deny
-        run: cargo deny check --all-features
+        run: cargo deny --all-features check
         continue-on-error: false
 
       # ==================== Report Issues ====================
