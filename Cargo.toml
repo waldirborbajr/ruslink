@@ -1,6 +1,6 @@
 [package]
 name = "ruslink"
-version = "0.4.3"
+version = "0.4.4"
 edition = "2021"
 description = "A fast, modern Rust implementation of GNU Stow with built-in Git support"
 authors = ["Waldir Borba Junior <wborbajr@gmail.com>"]
