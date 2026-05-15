@@ -28,7 +28,7 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Current version: ${VERSION}"
+          echo "📦 Version: ${VERSION}"
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
@@ -78,7 +78,7 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      - name: Install cross (for aarch64 linux)
+      - name: Install cross (for Linux aarch64)
         if: matrix.use-cross
         uses: taiki-e/install-action@v2
         with:
@@ -100,18 +100,28 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && !matrix.use-cross
         run: strip "target/${{ matrix.target }}/release/ruslink"
 
-      - name: Archive artifact
+      - name: Archive + Generate SHA256
         shell: bash
         run: |
           cd target/${{ matrix.target }}/release
+          ARTIFACT="ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}"
+          
           if [[ "${{ matrix.target }}" == *windows* ]]; then
-            7z a -y ../../ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}.zip ruslink.exe
+            7z a -y "../../${ARTIFACT}.zip" ruslink.exe
+            cd ../../
+            sha256sum "${ARTIFACT}.zip" > "${ARTIFACT}.zip.sha256"
           else
-            tar czf ../../ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}.tar.gz ruslink
+            tar czf "../../${ARTIFACT}.tar.gz" ruslink
+            cd ../../
+            sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
           fi
 
-      - name: Upload Release Asset
+      - name: Upload Release Assets
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref }}
-          files: target/${{ matrix.target }}/release/ruslink-*
+          files: |
+            target/${{ matrix.target }}/release/ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}.tar.gz
+            target/${{ matrix.target }}/release/ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}.tar.gz.sha256
+            target/${{ matrix.target }}/release/ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}.zip
+            target/${{ matrix.target }}/release/ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}.zip.sha256
