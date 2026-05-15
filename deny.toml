@@ -1,8 +1,7 @@
 # deny.toml
-# Configuration for cargo-deny (security, licensing, bans, etc.)
+# Configuration for cargo-deny
 
 [graph]
-# Only analyze dependencies for the platforms we care about
 targets = [
     "x86_64-unknown-linux-gnu",
     "aarch64-unknown-linux-gnu",
@@ -11,46 +10,34 @@ targets = [
     "x86_64-pc-windows-msvc",
 ]
 all-features = true
-# exclude-dev = true        # Uncomment to ignore dev-dependencies
+# exclude-dev = true
 
 # =============================================================================
-# Advisories (Security vulnerabilities + unmaintained crates)
+# Advisories
 # =============================================================================
 [advisories]
-# How to handle unmaintained crates
-unmaintained = "workspace"     # Only error on direct dependencies (recommended)
-unsound = "workspace"          # Same for unsound crates
-# yanked = "deny"              # Uncomment if you want to ban yanked versions
+unmaintained = "workspace"
+unsound = "workspace"
+# yanked = "deny"
 
-# Ignore specific advisories (add RUSTSEC IDs when you accept the risk)
 ignore = [
-    # "RUSTSEC-202x-xxxxx",
+    # Add RUSTSEC IDs here when you accept the risk
 ]
 
 # =============================================================================
-# Bans (forbidden crates, multiple versions, wildcards)
+# Bans
 # =============================================================================
 [bans]
 multiple-versions = "deny"
 wildcards = "deny"
 
-# Explicitly ban problematic crates
-deny = [
-    # { crate = "openssl", use-instead = "rustls" },
-    # { crate = "git2", use-instead = "gix" },
-]
-
-# Temporary exceptions
-skip = [
-    # { crate = "some-crate@0.1", reason = "temporary" },
-]
-
+# Allow multiple versions of windows-sys (very common situation)
 skip-tree = [
-    # { crate = "windows-sys", reason = "foundational crate that updates very frequently" },
+    { crate = "windows-sys", reason = "Multiple versions are common in Windows ecosystem crates" },
 ]
 
 # =============================================================================
-# Sources (where dependencies come from)
+# Sources
 # =============================================================================
 [sources]
 unknown-registry = "deny"
@@ -68,19 +55,18 @@ allow = [
     "Apache-2.0 WITH LLVM-exception",
     "BSD-3-Clause",
     "ISC",
+    "MPL-2.0",                    # ← Added for colored crate
     "Unicode-3.0",
     "Unicode-DFS-2016",
     "Zlib",
-    # "Unlicense",          # Only if you're comfortable with it
 ]
 
 unused-allowed-license = "warn"
 
 exceptions = [
-    # Example for crates with special licenses:
+    # Add exceptions here if needed for specific crates
     # { crate = "ring", allow = ["MIT", "ISC", "OpenSSL"] },
 ]
 
-# Ignore license checks for private/unpublished workspace crates
 [licenses.private]
 ignore = true
