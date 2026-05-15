@@ -66,7 +66,7 @@ impl MergeHandler {
         config: &MergeConfig,
     ) -> Result<MergeAction> {
         if !destination.exists() && destination.symlink_metadata().is_err() {
-            debug!("No conflict: destination {:?} doesn't exist", destination);
+            debug!("No conflict: destination {destination:?} doesn't exist");
             return Ok(MergeAction::CreateLink);
         }
 
@@ -159,7 +159,7 @@ impl MergeHandler {
 
         // Escrever arquivo merged
         fs::write(destination, &dest_content)
-            .map_err(|e| anyhow!("Failed to write merged file {:?}: {}", destination, e))?;
+            .map_err(|e| anyhow!("Failed to write merged file {destination:?}: {e}"))?;
 
         // Logar merge se ativado
         if config.track_merges {
@@ -178,24 +178,21 @@ impl MergeHandler {
 
         let mut log = fs::read_to_string(&self.track_file).unwrap_or_default();
         log.push_str(&entry);
-        fs::write(&self.track_file, log)
-            .map_err(|e| anyhow!("Failed to write merge log: {}", e))?;
+        fs::write(&self.track_file, log).map_err(|e| anyhow!("Failed to write merge log: {e}"))?;
 
         debug!("Logged merge: {}", entry.trim());
         Ok(())
     }
 
     /// Exibir histórico de merges
-    pub fn show_merge_history(&self) -> Result<()> {
+    pub fn show_merge_history(&self) {
         match fs::read_to_string(&self.track_file) {
             Ok(log) => {
                 println!("\n📋 Merge History ({}):", self.track_file.display());
-                println!("{}", log);
-                Ok(())
+                println!("{log}");
             },
             Err(e) => {
                 warn!("No merge history found: {}", e);
-                Ok(())
             },
         }
     }

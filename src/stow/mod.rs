@@ -1,7 +1,7 @@
 // src/stow/mod.rs
 
 pub mod merge;
-mod stow;
+mod stowmanager;
 
 pub use merge::MergeConfig;
-pub use stow::{stow_package, unstow_package, StowStats};
+pub use stowmanager::{stow_package, unstow_package, StowStats};

@@ -36,11 +36,12 @@ pub fn stow_package(
     ignores: &[regex::Regex],
 ) -> Result<StowStats> {
     if !source.is_dir() {
-        anyhow::bail!("Source package must be a directory: {source:?}");
+        anyhow::bail!("Source package must be a directory: {}", source.display());
     }
 
     let start = Instant::now();
-    info!("Stowing from {:?} → {:?}", source, target);
+
+    info!("Stowing from {} → {}", source.display(), target.display());
 
     let merge_handler = if config.is_merge_enabled() {
         Some(MergeHandler::new(source, config.package.clone()))
@@ -50,14 +51,15 @@ pub fn stow_package(
 
     let mut stats = StowStats::default();
 
-    visit_source(source, source, target, config, ignores, &merge_handler, &mut stats)?;
+    visit_source(source, source, target, config, ignores, merge_handler.as_ref(), &mut stats)?;
 
     let elapsed = start.elapsed();
+
     stats.print_summary("Stow", elapsed);
 
     if config.show_merge_history {
         if let Some(handler) = &merge_handler {
-            handler.show_merge_history()?;
+            handler.show_merge_history();
         }
     }
 
@@ -71,17 +73,19 @@ pub fn unstow_package(
     ignores: &[regex::Regex],
 ) -> Result<StowStats> {
     if !source.is_dir() {
-        anyhow::bail!("Source package must be a directory: {source:?}");
+        anyhow::bail!("Source package must be a directory: {}", source.display());
     }
 
     let start = Instant::now();
-    info!("Unstowing from {:?} → {:?}", source, target);
+
+    info!("Unstowing from {} → {}", source.display(), target.display());
 
     let mut stats = StowStats::default();
 
     visit_unstow(source, source, target, config, ignores, &mut stats)?;
 
     let elapsed = start.elapsed();
+
     stats.print_summary("Unstow", elapsed);
 
     Ok(stats)
@@ -95,17 +99,20 @@ fn visit_source(
     target_base: &Path,
     config: &Config,
     ignores: &[regex::Regex],
-    merge_handlerstd::::Option<&stow::merge::MergeHandler>os_ref(),
+    merge_handler: Option<&MergeHandler>,
     stats: &mut StowStats,
 ) -> Result<()> {
     for entry in fs::read_dir(current)? {
         let entry = entry?;
         let path = entry.path();
+
         let rel_path = path.strip_prefix(root).unwrap_or(&path);
 
         if should_ignore(rel_path, ignores) {
             stats.files_ignored += 1;
-            debug!("Ignored: {:?}", rel_path);
+
+            debug!("Ignored: {}", rel_path.display());
+
             continue;
         }
 
@@ -150,8 +157,9 @@ fn stow_item(
                 MergeAction::AppendContent => {
                     if config.dry_run {
                         info!(
-                            "DRY RUN: would append content from {:?} to {:?}",
-                            source, destination
+                            "DRY RUN: would append content from {} to {}",
+                            source.display(),
+                            destination.display()
                         );
                     } else {
                         merge.append_content(destination, source, &config.merge_config)?;
@@ -161,7 +169,7 @@ fn stow_item(
                 },
 
                 MergeAction::MergeDirectories => {
-                    debug!("Both are directories, continuing recursion: {:?}", destination);
+                    debug!("Both are directories, continuing recursion: {}", destination.display());
 
                     return Ok(true);
                 },
@@ -169,7 +177,7 @@ fn stow_item(
                 MergeAction::Conflict => {
                     if !config.force && !config.adopt {
                         anyhow::bail!(
-                            "Conflict: {:?} already exists \
+                            "Conflict: {} already exists \
 (use --force, --adopt or --merge)",
                             destination.display()
                         );
@@ -184,7 +192,8 @@ fn stow_item(
     }
 
     if config.dry_run {
-        info!("DRY RUN: would link {:?} → {:?}", destination, source);
+        info!("DRY RUN: would link {} → {}", destination.display(), source.display());
+
         return Ok(true);
     }
 
@@ -192,7 +201,7 @@ fn stow_item(
 
     create_symlink(&relative, destination)?;
 
-    info!("Linked: {:?} → {:?}", destination, relative);
+    info!("Linked: {} → {}", destination.display(), relative.display());
 
     Ok(true)
 }
@@ -210,6 +219,7 @@ fn visit_unstow(
     for entry in fs::read_dir(current)? {
         let entry = entry?;
         let path = entry.path();
+
         let rel_path = path.strip_prefix(root).unwrap_or(&path);
 
         if should_ignore(rel_path, ignores) {
@@ -230,10 +240,12 @@ fn visit_unstow(
             }
 
             if config.dry_run {
-                info!("DRY RUN: would remove {:?}", destination);
+                info!("DRY RUN: would remove {}", destination.display());
             } else {
                 fs::remove_file(&destination)?;
-                info!("Removed: {:?}", destination);
+
+                info!("Removed: {}", destination.display());
+
                 stats.files_removed += 1;
             }
         }
@@ -254,7 +266,8 @@ fn handle_existing_destination(destination: &Path, config: &Config) -> Result<()
     }
 
     if config.adopt {
-        debug!("Adopting existing file: {:?}", destination);
+        debug!("Adopting existing file: {}", destination.display());
+
         remove_existing(destination)?;
     } else if config.force {
         if config.backup {
@@ -264,7 +277,7 @@ fn handle_existing_destination(destination: &Path, config: &Config) -> Result<()
         remove_existing(destination)?;
     } else {
         anyhow::bail!(
-            "Conflict: {:?} already exists \
+            "Conflict: {} already exists \
 (use --force or --adopt)",
             destination.display()
         );
@@ -284,12 +297,13 @@ fn backup_existing(path: &Path) -> Result<()> {
 
     while backup.exists() {
         backup = path.with_extension(format!("bak{counter}"));
+
         counter += 1;
     }
 
     fs::rename(path, &backup)?;
 
-    info!("Backed up: {:?} → {:?}", path, backup);
+    info!("Backed up: {} → {}", path.display(), backup.display());
 
     Ok(())
 }
