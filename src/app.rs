@@ -1,4 +1,5 @@
 // src/app.rs
+
 use anyhow::Result;
 use tracing::{debug, info};
 
@@ -13,68 +14,95 @@ pub fn run() -> Result<()> {
     human_panic::setup_panic!(human_panic::metadata!());
 
     let config = parse_args();
+
     setup_tracing(config.verbose);
 
     let package_path = config.stow_dir.join(&config.package);
 
     if !package_path.exists() {
-        error(&format!("Package '{}' not found in {:?}", config.package, config.stow_dir));
+        error(&format!("Package '{}' not found in {}", config.package, config.stow_dir.display()));
+
         std::process::exit(1);
     }
 
     info!("Package     : {}", config.package);
-    info!("Stow dir    : {:?}", config.stow_dir);
-    info!("Target dir  : {:?}", config.target_dir);
+
+    info!("Stow dir    : {}", config.stow_dir.display());
+
+    info!("Target dir  : {}", config.target_dir.display());
 
     if config.dry_run {
         warning("*** DRY RUN MODE ENABLED ***");
     }
 
     let ignore_regexes = load_all_ignore_patterns(&package_path);
+
     debug!("Loaded {} ignore patterns", ignore_regexes.len());
 
-    // ====================== CONFIRM DESTRUCTIVE ACTIONS ======================
+    // ======================
+    // CONFIRM DESTRUCTIVE ACTIONS
+    // ======================
+
     if !config.yes && !config.dry_run && config.is_destructive() {
-        if config.delete || config.restow {
-            if !confirm_action("DELETE / UNSTOW", &config) {
-                warning("Operation cancelled by user.");
-                std::process::exit(0);
-            }
+        if (config.delete || config.restow) && !confirm_action("DELETE / UNSTOW", &config) {
+            warning("Operation cancelled by user.");
+
+            std::process::exit(0);
         }
 
-        if (config.force || config.adopt) && !config.delete {
-            if !confirm_action("FORCE / ADOPT existing files", &config) {
-                warning("Operation cancelled by user.");
-                std::process::exit(0);
-            }
+        if (config.force || config.adopt)
+            && !config.delete
+            && !confirm_action("FORCE / ADOPT existing files", &config)
+        {
+            warning("Operation cancelled by user.");
+
+            std::process::exit(0);
         }
     }
 
     let mut total_stats = StowStats::default();
 
-    // Unstow
+    // ======================
+    // UNSTOW
+    // ======================
+
     if config.restow || config.delete {
         info!("Unstowing package '{}'...", config.package);
+
         let unstow_stats =
             unstow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
+
         total_stats.files_removed = unstow_stats.files_removed;
     }
 
-    // Stow
+    // ======================
+    // STOW
+    // ======================
+
     if !config.delete {
         info!("Stowing package '{}'...", config.package);
+
         let stow_stats = stow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
+
         total_stats.files_linked = stow_stats.files_linked;
+
         total_stats.dirs_created = stow_stats.dirs_created;
+
         total_stats.files_ignored = stow_stats.files_ignored;
     }
 
-    // Git Operations
+    // ======================
+    // GIT OPERATIONS
+    // ======================
+
     if !config.dry_run && !config.delete {
-        handle_git_operations(&package_path, &config)?;
+        handle_git_operations(&package_path, &config);
     }
 
-    // Final Summary
+    // ======================
+    // FINAL SUMMARY
+    // ======================
+
     if config.dry_run {
         warning("Dry run completed. No changes were made.");
     } else {

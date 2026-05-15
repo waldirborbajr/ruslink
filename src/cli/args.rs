@@ -1,4 +1,7 @@
 // src/cli/args.rs
+
+#![allow(clippy::struct_excessive_bools)]
+
 use clap::Parser;
 use std::path::PathBuf;
 
@@ -12,7 +15,7 @@ use super::config::Config;
   ruslink nvim --git --message \"Update neovim\"
   ruslink nvim --restow --force
   ruslink nvim --dry-run -v
-  
+
 MERGE MODE (múltiplos packages):
   ruslink base --target ~
   ruslink dev --target ~ --merge --merge-append
@@ -69,20 +72,22 @@ struct Args {
     #[arg(short = 'm', long)]
     message: Option<String>,
 
-    /// Automatically answer yes to all prompts (skip confirmation)
+    /// Automatically answer yes to all prompts
     #[arg(short = 'y', long = "yes")]
     yes: bool,
 
-    // ====================== NOVO: MERGE MODE ======================
-    /// Enable merge mode: allow multiple packages to modify same files
+    // ======================
+    // MERGE MODE
+    // ======================
+    /// Enable merge mode
     #[arg(long)]
     merge: bool,
 
-    /// When merging, append content instead of conflicting
+    /// Append content instead of conflicting
     #[arg(long)]
     merge_append: bool,
 
-    /// File extensions to auto-append (comma-separated, e.g. ".bashrc,.zshrc")
+    /// File extensions to auto-append
     #[arg(long)]
     merge_extensions: Option<String>,
 
@@ -97,11 +102,13 @@ pub fn parse_args() -> Config {
     let stow_dir =
         args.dir.unwrap_or_else(|| std::env::current_dir().expect("Failed to get current dir"));
 
-    let target_dir = args.target.unwrap_or_else(|| {
-        stow_dir.parent().map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/"))
-    });
+    let target_dir = args
+        .target
+        .unwrap_or_else(|| stow_dir.parent().map_or_else(|| PathBuf::from("/"), PathBuf::from));
 
-    // ====================== NOVO: PARSE MERGE CONFIG ======================
+    // ======================
+    // MERGE CONFIG
+    // ======================
 
     let mut merge_config = crate::stow::MergeConfig::default();
 
@@ -115,23 +122,40 @@ pub fn parse_args() -> Config {
 
     Config {
         package: args.package,
+
         stow_dir,
+
         target_dir,
+
         delete: args.delete,
+
         restow: args.restow,
+
         dry_run: args.dry_run,
+
         verbose: args.verbose,
+
         auto_git: args.git,
+
         git_push: args.git_push,
+
         force: args.force,
+
         backup: args.backup,
+
         adopt: args.adopt,
+
         commit_message: args.message,
+
         yes: args.yes,
 
-        // NOVO
+        // ======================
+        // MERGE
+        // ======================
         merge: args.merge || args.merge_append,
+
         merge_config,
+
         show_merge_history: args.show_merge_history,
     }
 }

@@ -1,5 +1,6 @@
 // src/git/git.rs
 use anyhow::Result;
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use tracing::{debug, info};
@@ -167,10 +168,10 @@ impl GitRepository {
 
             let mut error_msg = format!("git {} failed", args.join(" "));
             if !stderr.is_empty() {
-                error_msg.push_str(&format!("\nstderr: {}", stderr));
+                let _ = write!(error_msg, "\nstderr: {stderr}");
             }
             if !stdout.is_empty() {
-                error_msg.push_str(&format!("\nstdout: {}", stdout));
+                let _ = write!(error_msg, "\nstdout: {stdout}");
             }
             anyhow::bail!(error_msg);
         }

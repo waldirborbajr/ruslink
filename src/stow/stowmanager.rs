@@ -147,7 +147,7 @@ fn stow_item(
 
     if destination.exists() || destination.symlink_metadata().is_ok() {
         if let Some(merge) = merge_handler {
-            match merge.resolve_conflict(destination, source, &config.merge_config)? {
+            match merge.resolve_conflict(destination, source, &config.merge_config) {
                 MergeAction::CreateLink => {
                     if !config.dry_run {
                         remove_existing(destination)?;

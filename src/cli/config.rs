@@ -45,13 +45,13 @@ pub struct Config {
 impl Config {
     /// Returns true if any destructive operation is enabled.
     #[must_use]
-    pub fn is_destructive(&self) -> bool {
+    pub const fn is_destructive(&self) -> bool {
         self.delete || self.restow || self.force || self.adopt
     }
 
     /// Returns true if merge mode is enabled.
     #[must_use]
-    pub fn is_merge_enabled(&self) -> bool {
+    pub const fn is_merge_enabled(&self) -> bool {
         self.merge && self.merge_config.enabled
     }
 }
