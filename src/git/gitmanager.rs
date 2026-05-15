@@ -1,4 +1,4 @@
-// src/git/git.rs
+// src/git/gitmanager.rs
 use anyhow::Result;
 use std::fmt::Write;
 use std::path::{Path, PathBuf};

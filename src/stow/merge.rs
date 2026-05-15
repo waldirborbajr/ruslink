@@ -1,3 +1,5 @@
+// /src/stow/merge.rs
+
 use anyhow::{anyhow, Result};
 use std::fs;
 use std::path::{Path, PathBuf};

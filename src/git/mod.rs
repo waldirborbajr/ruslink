@@ -1,4 +1,5 @@
 // src/git/mod.rs
+
 mod gitmanager;
 mod operations; // was: mod git;
 

@@ -1,4 +1,5 @@
 // src/utils/ignore.rs
+
 use std::path::Path;
 use std::sync::OnceLock;
 

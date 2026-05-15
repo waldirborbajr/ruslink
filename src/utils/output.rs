@@ -1,4 +1,5 @@
 // src/utils/output.rs
+
 #[cfg(feature = "colors")]
 use colored::Colorize;
 
