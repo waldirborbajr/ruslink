@@ -13,7 +13,7 @@ fn sanitize_commit_message(message: &str) -> String {
 
     sanitized = sanitized
         .lines()
-        .map(|line| line.trim())
+        .map(str::trim) // was: .map(|line| line.trim())
         .filter(|line| !line.is_empty())
         .collect::<Vec<_>>()
         .join("\n");

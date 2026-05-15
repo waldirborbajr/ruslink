@@ -2,7 +2,7 @@
 use std::path::Path;
 use tracing::{debug, info};
 
-use super::git::GitRepository;
+use super::gitmanager::GitRepository;
 use crate::cli::Config;
 use crate::utils::{error, warning};
 
@@ -27,7 +27,7 @@ pub fn handle_git_operations(package_path: &Path, config: &Config) {
                 warning(&format!("Git push failed: {e}"));
             }
         }
-    } else if let Ok(true) = repo.has_changes() {
+    } else if matches!(repo.has_changes(), Ok(true)) {
         info!("Changes detected. Creating automatic commit...");
         if let Err(e) = repo.auto_commit_silent(&config.package) {
             debug!("Auto-commit failed: {e}");

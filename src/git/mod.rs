@@ -1,5 +1,5 @@
 // src/git/mod.rs
-mod git;
-mod operations;
+mod gitmanager;
+mod operations; // was: mod git;
 
 pub use operations::handle_git_operations;

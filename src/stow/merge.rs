@@ -73,7 +73,6 @@ impl MergeHandler {
 
     /// Resolve conflito entre source e destination
     pub fn resolve_conflict(
-        &self,
         destination: &Path,
         source: &Path,
         config: &MergeConfig,
