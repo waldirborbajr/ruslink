@@ -109,21 +109,17 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      # Required for MUSL static builds
       - name: Install musl tools
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
-      # Main fix: Use --locked only when possible, fallback gracefully
+      # Fixed Build Command
       - name: Build release
-        run: |
-          if [ -f Cargo.lock ]; then
-            cargo build --release --locked --target ${{ matrix.target }}
-          else
-            cargo build --release --target ${{ matrix.target }}
-          fi
+        run: cargo build --release --locked --target ${{ matrix.target }}
+        env:
+          CARGO_INCREMENTAL: 0
 
-  # ==================== Security Audit ====================
+  # Security Audit (already good)
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
@@ -146,7 +142,6 @@ jobs:
       - name: Audit dependencies
         run: cargo audit --all-features --ignore-until 2026-12-31
 
-  # (Coverage and Docs kept as they were)
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
