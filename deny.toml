@@ -1,12 +1,93 @@
 # deny.toml
-[licenses]
-allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "ISC", "Unicode-DFS-2016"]
-copyleft = "deny"
+# Configuration for cargo-deny (security, licensing, and dependency policy)
+# Run with: cargo deny check
 
+[graph]
+# Only analyze dependencies relevant to common platforms
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+]
+all-features = true
+# exclude-dev = true     # Uncomment if you want to ignore dev-dependencies
+
+# =============================================================================
+# Advisories (security vulnerabilities)
+# =============================================================================
+[advisories]
+# Treat unmaintained crates seriously
+unmaintained = "deny"
+# unsound = "deny"           # Uncomment if you want to ban unsound crates
+# yanked = "deny"
+
+# Add specific advisory IDs here when you consciously accept the risk
+ignore = [
+    # Example: "RUSTSEC-202x-xxxxx"
+]
+
+# =============================================================================
+# Bans (forbidden crates / version conflicts)
+# =============================================================================
 [bans]
+# Deny multiple versions of the same crate (very strict — good default)
 multiple-versions = "deny"
 wildcards = "deny"
 
+# Add crates you want to explicitly ban here
+deny = [
+    # { crate = "openssl", use-instead = "rustls" },
+    # { crate = "git2", use-instead = "gix" },
+]
+
+# Temporary allowances for known conflicts
+skip = [
+    # { crate = "some-crate@0.1", reason = "temporary" },
+]
+
+skip-tree = [
+    # { crate = "windows-sys", reason = "foundational crate that updates frequently" },
+]
+
+# =============================================================================
+# Sources (where dependencies come from)
+# =============================================================================
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+
+# =============================================================================
+# Licenses
+# =============================================================================
+[licenses]
+# High confidence required when guessing license from text
+confidence-threshold = 0.93
+
+# Allowed licenses
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    # "Unlicense",          # Uncomment only if you're okay with it
+]
+
+# Warn about licenses we allow but aren't using (helps keep the list clean)
+unused-allowed-license = "warn"
+
+# Exceptions for specific crates that need special licenses
+exceptions = [
+    # Example:
+    # { crate = "ring", allow = ["MIT", "ISC", "OpenSSL"] },
+]
+
+# Private workspace crates (ignore license check for unpublished crates)
+[licenses.private]
+ignore = true
+# registries = ["my-private-registry"]   # if needed
