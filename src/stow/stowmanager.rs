@@ -53,7 +53,15 @@ pub fn stow_package(
 
     let mut stats = StowStats::default();
 
-    visit_source(source, source, target, config, ignores, merge_handler.as_ref(), &mut stats)?;
+    visit_source(
+        source,
+        source,
+        target,
+        config,
+        ignores,
+        merge_handler.as_ref(),
+        &mut stats,
+    )?;
 
     let elapsed = start.elapsed();
 
@@ -126,7 +134,15 @@ fn visit_source(
                 stats.dirs_created += 1;
             }
 
-            visit_source(root, &path, target_base, config, ignores, merge_handler, stats)?;
+            visit_source(
+                root,
+                &path,
+                target_base,
+                config,
+                ignores,
+                merge_handler,
+                stats,
+            )?;
         } else if stow_item(&path, &destination, config, merge_handler)? {
             stats.files_linked += 1;
         }
@@ -154,7 +170,7 @@ fn stow_item(
                     if !config.dry_run {
                         remove_existing(destination)?;
                     }
-                },
+                }
 
                 MergeAction::AppendContent => {
                     if config.dry_run {
@@ -168,13 +184,16 @@ fn stow_item(
                     }
 
                     return Ok(true);
-                },
+                }
 
                 MergeAction::MergeDirectories => {
-                    debug!("Both are directories, continuing recursion: {}", destination.display());
+                    debug!(
+                        "Both are directories, continuing recursion: {}",
+                        destination.display()
+                    );
 
                     return Ok(true);
-                },
+                }
 
                 MergeAction::Conflict => {
                     if !config.force && !config.adopt {
@@ -186,7 +205,7 @@ fn stow_item(
                     }
 
                     handle_existing_destination(destination, config)?;
-                },
+                }
             }
         } else {
             handle_existing_destination(destination, config)?;
@@ -194,7 +213,11 @@ fn stow_item(
     }
 
     if config.dry_run {
-        info!("DRY RUN: would link {} → {}", destination.display(), source.display());
+        info!(
+            "DRY RUN: would link {} → {}",
+            destination.display(),
+            source.display()
+        );
 
         return Ok(true);
     }
@@ -259,7 +282,10 @@ fn visit_unstow(
 // ====================== HELPERS ======================
 
 fn handle_existing_destination(destination: &Path, config: &Config) -> Result<()> {
-    if destination.symlink_metadata().is_ok_and(|m| m.file_type().is_symlink()) {
+    if destination
+        .symlink_metadata()
+        .is_ok_and(|m| m.file_type().is_symlink())
+    {
         if !config.dry_run {
             fs::remove_file(destination)?;
         }
@@ -326,7 +352,10 @@ fn is_managed_symlink(destination: &Path, source: &Path) -> bool {
         let abs_link = if link.is_absolute() {
             link
         } else {
-            destination.parent().unwrap_or_else(|| Path::new(".")).join(link)
+            destination
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join(link)
         };
 
         if let (Ok(a), Ok(b)) = (abs_link.canonicalize(), source.canonicalize()) {

@@ -65,10 +65,15 @@ pub struct MergeHandler {
 
 impl MergeHandler {
     pub fn new(package_path: &Path, package_name: String) -> Self {
-        let track_file =
-            package_path.parent().unwrap_or_else(|| Path::new(".")).join(".ruslink-merge-log");
+        let track_file = package_path
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(".ruslink-merge-log");
 
-        Self { track_file, package_name }
+        Self {
+            track_file,
+            package_name,
+        }
     }
 
     /// Resolve conflito entre source e destination
@@ -78,7 +83,10 @@ impl MergeHandler {
         config: &MergeConfig,
     ) -> MergeAction {
         if !destination.exists() && destination.symlink_metadata().is_err() {
-            debug!("No conflict: destination {} doesn't exist", destination.display());
+            debug!(
+                "No conflict: destination {} doesn't exist",
+                destination.display()
+            );
 
             return MergeAction::CreateLink;
         }
@@ -109,13 +117,19 @@ impl MergeHandler {
 
         // Merge entre diretórios
         if destination.is_dir() && source.is_dir() {
-            debug!("Both are directories, can merge recursively: {}", destination.display());
+            debug!(
+                "Both are directories, can merge recursively: {}",
+                destination.display()
+            );
 
             return MergeAction::MergeDirectories;
         }
 
         // Conflito real
-        warn!("Conflict detected at {}: file exists and is not mergeable", destination.display());
+        warn!(
+            "Conflict detected at {}: file exists and is not mergeable",
+            destination.display()
+        );
 
         MergeAction::Conflict
     }
@@ -135,7 +149,10 @@ impl MergeHandler {
 
         // Verificar extensão
         if let Some(ext) = destination.extension().and_then(|e| e.to_str()) {
-            return config.append_extensions.iter().any(|e| e.trim_start_matches('.') == ext);
+            return config
+                .append_extensions
+                .iter()
+                .any(|e| e.trim_start_matches('.') == ext);
         }
 
         false
@@ -199,7 +216,11 @@ impl MergeHandler {
             self.log_merge(destination)?;
         }
 
-        info!("✓ Merged content from {} into {}", self.package_name, destination.display());
+        info!(
+            "✓ Merged content from {} into {}",
+            self.package_name,
+            destination.display()
+        );
 
         Ok(())
     }
@@ -208,8 +229,12 @@ impl MergeHandler {
     fn log_merge(&self, file: &Path) -> Result<()> {
         let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
-        let entry =
-            format!("[{}] Package: {} | File: {}\n", timestamp, self.package_name, file.display());
+        let entry = format!(
+            "[{}] Package: {} | File: {}\n",
+            timestamp,
+            self.package_name,
+            file.display()
+        );
 
         let mut log = fs::read_to_string(&self.track_file).unwrap_or_default();
 
@@ -229,11 +254,11 @@ impl MergeHandler {
                 println!("\n📋 Merge History ({}):", self.track_file.display());
 
                 println!("{log}");
-            },
+            }
 
             Err(e) => {
                 warn!("No merge history found: {}", e);
-            },
+            }
         }
     }
 }

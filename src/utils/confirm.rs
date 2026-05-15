@@ -13,7 +13,10 @@ pub fn confirm_action(action: &str, config: &Config) -> bool {
     }
 
     println!();
-    warning(&format!("⚠️  This action will {} the package '{}'", action, config.package));
+    warning(&format!(
+        "⚠️  This action will {} the package '{}'",
+        action, config.package
+    ));
 
     if config.force {
         warning("   --force mode is enabled: existing files may be overwritten!");

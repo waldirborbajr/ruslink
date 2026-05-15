@@ -107,5 +107,7 @@ pub fn should_ignore(path: &Path, regexes: &[Regex]) -> bool {
     let path_str = path.to_string_lossy().replace('\\', "/");
     let file_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
 
-    regexes.iter().any(|re| re.is_match(&path_str) || re.is_match(file_name))
+    regexes
+        .iter()
+        .any(|re| re.is_match(&path_str) || re.is_match(file_name))
 }

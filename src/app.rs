@@ -20,7 +20,11 @@ pub fn run() -> Result<()> {
     let package_path = config.stow_dir.join(&config.package);
 
     if !package_path.exists() {
-        error(&format!("Package '{}' not found in {}", config.package, config.stow_dir.display()));
+        error(&format!(
+            "Package '{}' not found in {}",
+            config.package,
+            config.stow_dir.display()
+        ));
 
         std::process::exit(1);
     }

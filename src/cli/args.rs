@@ -94,12 +94,15 @@ struct Args {
 pub fn parse_args() -> Config {
     let args = Args::parse();
 
-    let stow_dir =
-        args.dir.unwrap_or_else(|| std::env::current_dir().expect("Failed to get current dir"));
+    let stow_dir = args
+        .dir
+        .unwrap_or_else(|| std::env::current_dir().expect("Failed to get current dir"));
 
-    let target_dir = args
-        .target
-        .unwrap_or_else(|| stow_dir.parent().map_or_else(|| PathBuf::from("/"), PathBuf::from));
+    let target_dir = args.target.unwrap_or_else(|| {
+        stow_dir
+            .parent()
+            .map_or_else(|| PathBuf::from("/"), PathBuf::from)
+    });
 
     let mut merge_settings = crate::stow::MergeConfig::default();
 
