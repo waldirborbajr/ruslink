@@ -37,25 +37,23 @@ help:
     @echo ""
     @echo "=== Maintenance ==="
     @echo " just update               → Update dependencies + Cargo.lock"
-    @echo " just pre-commit           → Full preparation before commit (recommended)"
+    @echo " just pre-commit           → Full preparation before commit"
     @echo " just check-lock           → Verify Cargo.lock consistency"
     @echo " just build-release-strict → Build with --locked (CI-like)"
-    @echo " just release              → Build + install locally"
-    @echo " just clean                → Clean build artifacts"
-    @echo " just cache                → Clear cargo cache"
-    @echo " just size                 → Show binary sizes"
+    @echo ""
+    @echo "=== Release ==="
+    @echo " just release-dry-run      → Show what the release will do (safe)"
+    @echo " just release              → Create git tag + push (uses Cargo.toml version)"
+    @echo " just release-local        → Build and install locally"
     @echo ""
 
 # ─── Build & Development ───────────────────────────────────────
-# Watch + build (default features: git + colors)
 build:
     cargo watch -c -w src/ -x "build --color=always"
 
-# Watch + run
 run:
     cargo watch -c -w src/ -x "run --color=always"
 
-# Shortcuts
 b: build
 r: run
 
@@ -97,16 +95,11 @@ clippy-fix:
 lint: fmt-check clippy
 
 # ─── Maintenance ───────────────────────────────────────────────
-
-# Update dependencies and Cargo.lock
 update:
     cargo update
     just cache
     @echo "✅ Dependencies updated and Cargo.lock regenerated!"
-    @echo "💡 Don't forget to commit the lockfile:"
-    @echo "   git add Cargo.lock && git commit -m 'chore: update Cargo.lock'"
 
-# Full preparation before committing (recommended)
 pre-commit:
     just fmt
     just lint
@@ -114,31 +107,55 @@ pre-commit:
     just check-lock
     @echo "🎉 Pre-commit checks completed! Ready to commit."
 
-# Verify Cargo.lock is consistent with Cargo.toml
 check-lock:
     cargo check --locked
     @echo "✅ Cargo.lock is consistent with Cargo.toml"
 
-# Build with strict locked mode (same as CI)
 build-release-strict:
     cargo build --release --locked
     @echo "✅ Release build with --locked completed successfully!"
 
-# Clean build artifacts
 clean:
     cargo clean
 
-# Clear cargo cache
 cache:
-    cargo-cache --remove-dir all || echo "cargo-cache not installed (optional tool)"
+    cargo-cache --remove-dir all || echo "cargo-cache not installed (optional)"
 
-# Build and install locally
+# ─── Release ───────────────────────────────────────────────────
+
+# Extract version from Cargo.toml (robust method)
+version := `grep '^version =' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/' | head -n1`
+
+# Dry run - safe preview
+release-dry-run:
+    @echo "Current version in Cargo.toml → {{version}}"
+    @echo "Tag that will be created   → v{{version}}"
+    @echo ""
+    @echo "This command will:"
+    @echo "   1. Run pre-commit (fmt, lint, update, check-lock)"
+    @echo "   2. Commit Cargo.lock if changed"
+    @echo "   3. Create annotated tag v{{version}}"
+    @echo "   4. Push commit + tag to GitHub"
+
+# Create release: commit + tag + push
 release:
+    @echo "=== Preparing release v{{version}} ==="
+    just pre-commit
+    
+    @echo "Committing Cargo.lock (if there are changes)..."
+    git add Cargo.lock
+    git commit -m "chore: update Cargo.lock for v{{version}}" || echo "→ No changes to Cargo.lock"
+    
+    @echo "Creating git tag v{{version}}..."
+    git tag -a "v{{version}}" -m "Release v{{version}}"
+    
+    @echo "Pushing commit and tag..."
+    git push origin main --follow-tags
+    
+    @echo ""
+    @echo "🎉 Release v{{version}} created and pushed successfully!"
+
+# Local install
+release-local:
     just build-release-strict
     cargo install --path . --locked
-
-# Show binary sizes
-size:
-    @echo "Binary sizes:"
-    @ls -lh target/release/ruslink 2>/dev/null || echo "Release binary not found"
-    @ls -lh target/debug/ruslink 2>/dev/null || echo "Debug binary not found"
