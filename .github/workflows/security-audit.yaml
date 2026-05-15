@@ -1,3 +1,94 @@
+# name: Security Audit
+
+# on:
+#   push:
+#     branches: [main, master]
+#     paths:
+#       - "**/Cargo.toml"
+#       - "**/Cargo.lock"
+#       - ".github/workflows/security-audit.yml"
+#       - ".github/workflows/rust-ci.yaml"
+
+#   pull_request:
+#     branches: [main, master]
+#     paths:
+#       - "**/Cargo.toml"
+#       - "**/Cargo.lock"
+#       - ".github/workflows/security-audit.yml"
+
+#   # Daily automatic check (recommended)
+#   # schedule:
+#   #   - cron: '0 3 * * *'   # Every day at 03:00 UTC
+
+# permissions:
+#   contents: read
+#   issues: write      # Required to create issues on vulnerabilities
+#   checks: write
+
+# env:
+#   CARGO_TERM_COLOR: always
+#   RUST_BACKTRACE: 1
+
+# jobs:
+#   audit:
+#     name: Security Audit (cargo-audit + cargo-deny)
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 15
+
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       - name: Install stable toolchain
+#         uses: dtolnay/rust-toolchain@stable
+#         with:
+#           components: rustfmt, clippy
+
+#       - name: Cache cargo
+#         uses: Swatinem/rust-cache@v2
+#         with:
+#           shared-key: security-audit
+
+#       - name: Install cargo-audit
+#         uses: taiki-e/install-action@v2
+#         with:
+#           tool: cargo-audit
+
+#       # ==================== cargo audit ====================
+#       - name: Audit dependencies (cargo-audit)
+#         run: cargo audit --all-features --ignore-until 2026-12-31
+#         continue-on-error: true
+#         id: audit
+
+#       # ==================== cargo deny (using official action) ====================
+#       - name: Check with cargo-deny
+#         uses: EmbarkStudios/cargo-deny-action@v2
+#         with:
+#           command: check
+#           arguments: --all-features
+#           # log-level: warn        # Optional: change to 'error' if you want stricter output
+
+#       # ==================== Report Issues ====================
+#       - name: Create Issue on vulnerability
+#         if: failure() && github.event_name == 'push' && steps.audit.outcome == 'failure'
+#         uses: actions/github-script@v7
+#         with:
+#           script: |
+#             const fs = require('fs');
+#             const output = fs.readFileSync(process.env.GITHUB_STEP_SUMMARY || '/tmp/audit.log', 'utf8') || 'Cargo audit failed';
+            
+#             await github.rest.issues.create({
+#               owner: context.repo.owner,
+#               repo: context.repo.repo,
+#               title: `🚨 Security Vulnerability Detected in Dependencies`,
+#               body: `**Cargo audit encontrou vulnerabilidades.**\n\n` +
+#                     `Branch: \`${context.ref}\`\n` +
+#                     `Commit: ${context.sha}\n\n` +
+#                     '```\n' + output + '\n```',
+#               labels: ['security', 'vulnerability']
+#             });
+
+
 name: Security Audit
 
 on:
@@ -16,13 +107,13 @@ on:
       - "**/Cargo.lock"
       - ".github/workflows/security-audit.yml"
 
-  # Daily automatic check (recommended)
+  # Daily check (highly recommended)
   # schedule:
   #   - cron: '0 3 * * *'   # Every day at 03:00 UTC
 
 permissions:
   contents: read
-  issues: write      # Required to create issues on vulnerabilities
+  issues: write
   checks: write
 
 env:
@@ -60,22 +151,25 @@ jobs:
         continue-on-error: true
         id: audit
 
-      # ==================== cargo deny (using official action) ====================
+      # ==================== cargo deny (Official Action) ====================
       - name: Check with cargo-deny
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check
           arguments: --all-features
-          # log-level: warn        # Optional: change to 'error' if you want stricter output
+          # log-level: error      # Options: error, warn, info (default)
 
-      # ==================== Report Issues ====================
+      # ==================== Report Issues (only on push) ====================
       - name: Create Issue on vulnerability
         if: failure() && github.event_name == 'push' && steps.audit.outcome == 'failure'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const output = fs.readFileSync(process.env.GITHUB_STEP_SUMMARY || '/tmp/audit.log', 'utf8') || 'Cargo audit failed';
+            let output = 'Cargo audit failed';
+            try {
+              output = fs.readFileSync(process.env.GITHUB_STEP_SUMMARY || '/tmp/audit.log', 'utf8');
+            } catch (e) {}
             
             await github.rest.issues.create({
               owner: context.repo.owner,
