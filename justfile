@@ -124,7 +124,8 @@ cache:
 # ─── Release ───────────────────────────────────────────────────
 
 # Extract version from Cargo.toml (robust method)
-version := `grep '^version =' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/' | head -n1`
+version := `grep "^version" Cargo.toml | awk -F'"' '{print $2}' | head -n1`
+
 
 # Dry run - safe preview
 release-dry-run:
