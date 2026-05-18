@@ -148,12 +148,15 @@ release-dry-run:
 # Clean old tag + artifacts then release
 release-clean:
     @echo "🧹 Preparing fresh release for v{{version}}..."
+
     just clean-release-artifacts
-    
-    @echo "→ Removing old git tag (local and remote)..."
-    git tag -d "v{{version}}" 2>/dev/null && echo "→ Local tag v{{version}} deleted" || echo "→ No local tag found"
-    git push origin --delete "v{{version}}" 2>/dev/null && echo "→ Remote tag v{{version}} deleted" || echo "→ No remote tag found"
-    
+
+    @echo "→ Removing old GitHub Release and tag..."
+    gh release delete "v{{version}}" --yes --cleanup-tag 2>/dev/null && echo "→ GitHub Release + tag deleted" || echo "→ No release/tag found to delete"
+
+    @echo "→ Removing local git tag (if exists)..."
+    git tag -d "v{{version}}" 2>/dev/null && echo "→ Local tag deleted" || echo "→ No local tag"
+
     @echo ""
     @echo "🚀 Starting clean release..."
     just release
