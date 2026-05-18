@@ -41,12 +41,12 @@ help:
     @echo " just check-lock           → Verify Cargo.lock consistency"
     @echo " just build-release-strict → Build with --locked (CI-like)"
     @echo " just clean                → Cargo clean"
-    @echo " just clean-release-artifacts → Remove release binaries and packages"
+    @echo " just clean-release-artifacts → Remove release binaries"
     @echo ""
     @echo "=== Release ==="
     @echo " just release-dry-run      → Show what the release will do (safe)"
-    @echo " just release              → Create git tag + push"
-    @echo " just release-clean        → Delete old tag + artifacts then release"
+    @echo " just release              → Create git tag + GitHub Release with changelog"
+    @echo " just release-clean        → Delete old release + artifacts then release"
     @echo " just release-local        → Build and install locally"
     @echo ""
 
@@ -134,50 +134,63 @@ clean-release-artifacts:
 # ─── Release ───────────────────────────────────────────────────
 version := `grep "^version" Cargo.toml | awk -F'"' '{print $2}' | head -n1`
 
-# Dry run - safe preview
-release-dry-run:
-    @echo "Current version in Cargo.toml → {{version}}"
-    @echo "Tag that will be created → v{{version}}"
-    @echo ""
-    @echo "This command will:"
-    @echo " 1. Run pre-commit (fmt, lint, update, check-lock)"
-    @echo " 2. Commit Cargo.lock if changed"
-    @echo " 3. Create annotated tag v{{version}}"
-    @echo " 4. Push commit + tag to GitHub"
+# Generate changelog from commits since last tag
+changelog:
+    @echo "📜 Generating changelog for v{{version}}..."
+    @git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 2>/dev/null || echo "")..HEAD > CHANGELOG.tmp 2>/dev/null || echo "- Initial release" > CHANGELOG.tmp
+    @cat CHANGELOG.tmp
 
-# Clean old tag + artifacts then release
+# Dry run
+release-dry-run:
+    @echo "Current version → {{version}}"
+    @echo "Tag            → v{{version}}"
+    @echo ""
+    just changelog
+
+# Clean previous release + artifacts then create new one
 release-clean:
     @echo "🧹 Preparing fresh release for v{{version}}..."
 
     just clean-release-artifacts
 
-    @echo "→ Removing old GitHub Release and tag..."
-    gh release delete "v{{version}}" --yes --cleanup-tag 2>/dev/null && echo "→ GitHub Release + tag deleted" || echo "→ No release/tag found to delete"
+    @echo "→ Deleting old GitHub Release and tag..."
+    gh release delete "v{{version}}" --yes --cleanup-tag 2>/dev/null && echo "→ Old release deleted" || echo "→ No previous release found"
 
-    @echo "→ Removing local git tag (if exists)..."
+    @echo "→ Deleting local tag..."
     git tag -d "v{{version}}" 2>/dev/null && echo "→ Local tag deleted" || echo "→ No local tag"
 
     @echo ""
     @echo "🚀 Starting clean release..."
     just release
 
-# Create release: commit + tag + push
+# Main release with changelog
 release:
     @echo "=== Preparing release v{{version}} ==="
+    
     just pre-commit
-   
-    @echo "Committing Cargo.lock (if there are changes)..."
+
+    @echo "Committing Cargo.lock (if changed)..."
     git add Cargo.lock
     git commit -m "chore: update Cargo.lock for v{{version}}" || echo "→ No changes to Cargo.lock"
-   
-    @echo "Creating git tag v{{version}}..."
+
+    @echo "Generating changelog..."
+    just changelog
+
+    @echo "Creating annotated tag..."
     git tag -a "v{{version}}" -m "Release v{{version}}"
-   
+
     @echo "Pushing commit and tag..."
     git push origin main --follow-tags
-   
+
+    @echo "Creating GitHub Release with changelog..."
+    gh release create "v{{version}}" \
+        --title "v{{version}}" \
+        --notes-file CHANGELOG.tmp \
+        --latest
+
     @echo ""
-    @echo "🎉 Release v{{version}} created and pushed successfully!"
+    @echo "🎉 Release v{{version}} created successfully on GitHub!"
+    @rm -f CHANGELOG.tmp
 
 # Local install
 release-local:
