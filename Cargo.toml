@@ -7,7 +7,10 @@ authors = ["Waldir Borba Junior <wborbajr@gmail.com>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/waldirborbaje/ruslink"
 readme = "README.md"
-keywords = ["stow", "dotfiles", "symlink", "cli", "git", "configuration"]
+
+# Maximum 5 keywords allowed by crates.io
+keywords = ["stow", "dotfiles", "symlink", "cli", "git"]
+
 categories = ["command-line-utilities", "filesystem"]
 
 [dependencies]
@@ -28,16 +31,9 @@ chrono = { version = "0.4", features = ["clock"], optional = true }
 tempfile = "3.10"
 
 [features]
-# Features padrão (recomendado)
 default = ["git", "colors"]
-
-# Suporte a Git (commits, push, timestamps)
 git = ["dep:chrono"]
-
-# Cores no terminal (success, error, warning, etc.)
 colors = ["dep:colored"]
-
-# Build mínima (sem git e sem cores)
 minimal = []
 
 [profile.release]
