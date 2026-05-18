@@ -118,8 +118,7 @@ jobs:
       - name: Build release
         run: just build-release-strict
         env:
-          CARGO_TARGET_${{ replace(matrix.target, '-', '_') }}_LINKER: |
-            ${{ matrix.target == 'x86_64-unknown-linux-musl' && 'x86_64-linux-gnu-gcc' || '' }}
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.target == 'x86_64-unknown-linux-musl' && 'x86_64-linux-gnu-gcc' || '' }}
 
   # ==================== Security Audit ====================
   audit:
