@@ -46,11 +46,11 @@ jobs:
         with:
           shared-key: stable-linux
 
-      - name: Install Just
-        uses: extractions/setup-just@v2
+      - name: Format check
+        run: cargo fmt --all -- --check
 
-      - name: Run checks
-        run: just lint
+      - name: Clippy lint
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
   test:
     name: Test (${{ matrix.os }})
@@ -71,7 +71,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run tests
-        run: just test
+        run: cargo test --all-features -- --nocapture
 
   build:
     name: Build (${{ matrix.target }})
@@ -106,9 +106,6 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      - name: Install Just
-        uses: extractions/setup-just@v2
-
       # Required for musl builds
       - name: Install musl tools
         if: matrix.target == 'x86_64-unknown-linux-musl'
@@ -116,7 +113,7 @@ jobs:
 
       # Use strict build (uses --locked)
       - name: Build release
-        run: just build-release-strict
+        run: cargo build --release --locked --target ${{ matrix.target }}
         env:
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.target == 'x86_64-unknown-linux-musl' && 'x86_64-linux-gnu-gcc' || '' }}
 
