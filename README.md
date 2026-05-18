@@ -10,20 +10,44 @@
 [![Rust CI](https://github.com/waldirborbajr/ruslink/actions/workflows/rust-ci.yaml/badge.svg)](https://github.com/waldirborbajr/ruslink/actions/workflows/rust-ci.yaml)
 [![Security Audit](https://github.com/waldirborbajr/ruslink/actions/workflows/security-audit.yaml/badge.svg)](https://github.com/waldirborbajr/ruslink/actions/workflows/security-audit.yaml)
 
-A lightweight, production-ready Rust-based stow utility for managing dotfiles and package-style deployments with advanced features like merge mode, git integration, and intelligent conflict resolution.
+**A fast, modern Rust reimplementation of GNU Stow** with powerful features like intelligent merging, native Git integration, intelligent conflict resolution and excellent UX.
 
 ---
 
 ## Why ruslink?
 
-| Feature                      | GNU Stow     | ruslink              | Advantage                 |
-|------------------------------|--------------|----------------------|---------------------------|
-| Git Integration              | Weak         | **Native & Automatic** | Superior experience       |
-| Config file merging          | Not supported| **Intelligent Merge**   | Key differentiator        |
-| Dry-run + Logging            | Basic        | **Excellent**           | Much safer                |
-| Performance                  | Good         | **Excellent** (Rust)    | Lightweight binaries      |
-| Windows Support              | Poor         | Good                    | Cross-platform            |
-| Modern UX                    | Outdated     | **Modern**              | Easy to use               |
+| Feature                        | GNU Stow           | ruslink                          | Advantage |
+|-------------------------------|--------------------|----------------------------------|---------|
+| **Language & Performance**    | Perl               | **Rust** (fast, small binary)    | ★★★★★ |
+| **Merge Mode**                | Not supported      | **Intelligent append + markers** | ★★★★★ |
+| **Git Integration**           | None               | **Native auto-commit & push**    | ★★★★★ |
+| **Dotfiles Mode** (`dot-*`)   | Manual / hacky     | **Built-in & seamless**          | ★★★★ |
+| **Conflict Handling**         | Fail / `--adopt`   | Force, Adopt, Backup, **Merge**  | ★★★★★ |
+| **Dry Run & Safety**          | Basic              | **Excellent** with detailed logs | ★★★★ |
+| **User Experience**           | Outdated           | Modern, colorful, clear messages | ★★★★★ |
+| **Windows Support**           | Poor               | Good (native symlinks)           | ★★★★ |
+| **Binary Size**               | Depends on Perl    | **~3–8 MB** (static)             | ★★★★ |
+| **Maintenance**               | Low                | **Active development**           | ★★★★ |
+
+**ruslink = GNU Stow + Modern Features + Battery Included**
+
+---
+
+## Features
+
+### Core
+- Symlink-based package management (just like Stow)
+- Full support for `.gitignore` and `.ruslink.ignore`
+- `--dry-run`, `--force`, `--backup`, `--adopt`
+- Dotfiles mode: `dot-bashrc` → `.bashrc`, `dot-config/nvim` → `.config/nvim`
+
+### Advanced
+- **Merge Mode** — intelligently merge shell configs (`.bashrc`, `.zshrc`, `.fish/config.fish`, etc.)
+- **Git Integration** — automatic commit and optional push after stowing
+- **Clean command** — remove broken symlinks and empty directories
+- **Status & List** — overview of your packages
+- Interactive confirmations for destructive actions
+- Structured logging with `-v`
 
 ---
 

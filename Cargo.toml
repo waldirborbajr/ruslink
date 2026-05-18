@@ -1,6 +1,6 @@
 [package]
 name = "ruslink"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 description = "A fast, modern Rust implementation of GNU Stow with built-in Git support"
 authors = ["Waldir Borba Junior <wborbajr@gmail.com>"]
@@ -8,9 +8,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/waldirborbaje/ruslink"
 readme = "README.md"
 
-# Maximum 5 keywords allowed by crates.io
 keywords = ["stow", "dotfiles", "symlink", "cli", "git"]
-
 categories = ["command-line-utilities", "filesystem"]
 
 [dependencies]
@@ -22,8 +20,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 human-panic = "2.0.8"
 pathdiff = "0.2"
 once_cell = "1.20"
+walkdir = "2.5"
 
-# Dependências opcionais
 colored = { version = "2.1", optional = true }
 chrono = { version = "0.4", features = ["clock"], optional = true }
 

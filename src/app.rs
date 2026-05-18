@@ -5,7 +5,7 @@ use tracing::{debug, info};
 
 use crate::cli::parse_args;
 use crate::git::handle_git_operations;
-use crate::stow::{stow_package, unstow_package, StowStats};
+use crate::stow::{stow_package, unstow_package, StowStats, list_packages, show_status, clean_target};
 use crate::utils::{
     confirm_action, error, load_all_ignore_patterns, setup_tracing, success, warning,
 };
@@ -17,6 +17,25 @@ pub fn run() -> Result<()> {
 
     setup_tracing(config.verbose);
 
+    // ======================
+    // NEW COMMANDS
+    // ======================
+    if config.list {
+        return list_packages(&config.stow_dir);
+    }
+
+    if config.status {
+        show_status(&config.stow_dir, &config.target_dir, &config);
+        return Ok(());
+    }
+
+    if config.clean {
+        return clean_target(&config.target_dir, &config);
+    }
+
+    // ======================
+    // CLASSIC STOW OPERATIONS
+    // ======================
     let package_path = config.stow_dir.join(&config.package);
 
     if !package_path.exists() {
@@ -25,88 +44,62 @@ pub fn run() -> Result<()> {
             config.package,
             config.stow_dir.display()
         ));
-
         std::process::exit(1);
     }
 
     info!("Package     : {}", config.package);
-
     info!("Stow dir    : {}", config.stow_dir.display());
-
     info!("Target dir  : {}", config.target_dir.display());
+
+    if config.dotfiles {
+        info!("Dotfiles    : enabled (dot- prefix → .)");
+    }
 
     if config.dry_run {
         warning("*** DRY RUN MODE ENABLED ***");
     }
 
     let ignore_regexes = load_all_ignore_patterns(&package_path);
-
     debug!("Loaded {} ignore patterns", ignore_regexes.len());
 
-    // ======================
-    // CONFIRM DESTRUCTIVE ACTIONS
-    // ======================
-
+    // Confirm destructive actions
     if !config.yes && !config.dry_run && config.is_destructive() {
         if (config.delete || config.restow) && !confirm_action("DELETE / UNSTOW", &config) {
             warning("Operation cancelled by user.");
-
             std::process::exit(0);
         }
 
-        if (config.force || config.adopt)
-            && !config.delete
-            && !confirm_action("FORCE / ADOPT existing files", &config)
-        {
+        if (config.force || config.adopt) && !config.delete && !confirm_action("FORCE / ADOPT", &config) {
             warning("Operation cancelled by user.");
-
             std::process::exit(0);
         }
     }
 
     let mut total_stats = StowStats::default();
 
-    // ======================
     // UNSTOW
-    // ======================
-
     if config.restow || config.delete {
         info!("Unstowing package '{}'...", config.package);
-
-        let unstow_stats =
-            unstow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
-
+        let unstow_stats = unstow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
         total_stats.files_removed = unstow_stats.files_removed;
     }
 
-    // ======================
     // STOW
-    // ======================
-
     if !config.delete {
         info!("Stowing package '{}'...", config.package);
-
         let stow_stats = stow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
 
         total_stats.files_linked = stow_stats.files_linked;
-
         total_stats.dirs_created = stow_stats.dirs_created;
-
         total_stats.files_ignored = stow_stats.files_ignored;
     }
 
-    // ======================
     // GIT OPERATIONS
-    // ======================
-
     if !config.dry_run && !config.delete {
         handle_git_operations(&package_path, &config);
     }
 
-    // ======================
     // FINAL SUMMARY
-    // ======================
-
     if config.dry_run {
         warning("Dry run completed. No changes were made.");
     } else {
