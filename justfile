@@ -159,3 +159,11 @@ release:
 release-local:
     just build-release-strict
     cargo install --path . --locked
+
+# Clean release - remove old tag if it exists
+release-clean:
+    @echo "Cleaning up old tag v{{version}}..."
+    git tag -d "v{{version}}" 2>/dev/null || echo "→ Tag não existe localmente"
+    git push origin --delete "v{{version}}" 2>/dev/null || echo "→ Tag não existe no GitHub"
+    @echo "Agora rodando release..."
+    just release
