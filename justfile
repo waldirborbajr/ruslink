@@ -40,10 +40,13 @@ help:
     @echo " just pre-commit           → Full preparation before commit"
     @echo " just check-lock           → Verify Cargo.lock consistency"
     @echo " just build-release-strict → Build with --locked (CI-like)"
+    @echo " just clean                → Cargo clean"
+    @echo " just clean-release-artifacts → Remove release binaries and packages"
     @echo ""
     @echo "=== Release ==="
     @echo " just release-dry-run      → Show what the release will do (safe)"
-    @echo " just release              → Create git tag + push (uses Cargo.toml version)"
+    @echo " just release              → Create git tag + push"
+    @echo " just release-clean        → Delete old tag + artifacts then release"
     @echo " just release-local        → Build and install locally"
     @echo ""
 
@@ -121,38 +124,55 @@ clean:
 cache:
     cargo-cache --remove-dir all || echo "cargo-cache not installed (optional)"
 
+# ─── Release Artifacts Cleanup ─────────────────────────────────
+clean-release-artifacts:
+    @echo "🧹 Cleaning release artifacts..."
+    rm -rf target/release/ruslink target/release/ruslink.exe 2>/dev/null || true
+    rm -rf target/release/*.tar.gz target/release/*.zip 2>/dev/null || true
+    @echo "→ Release binaries and packages removed"
+
 # ─── Release ───────────────────────────────────────────────────
-
-# Extract version from Cargo.toml (robust method)
 version := `grep "^version" Cargo.toml | awk -F'"' '{print $2}' | head -n1`
-
 
 # Dry run - safe preview
 release-dry-run:
     @echo "Current version in Cargo.toml → {{version}}"
-    @echo "Tag that will be created   → v{{version}}"
+    @echo "Tag that will be created → v{{version}}"
     @echo ""
     @echo "This command will:"
-    @echo "   1. Run pre-commit (fmt, lint, update, check-lock)"
-    @echo "   2. Commit Cargo.lock if changed"
-    @echo "   3. Create annotated tag v{{version}}"
-    @echo "   4. Push commit + tag to GitHub"
+    @echo " 1. Run pre-commit (fmt, lint, update, check-lock)"
+    @echo " 2. Commit Cargo.lock if changed"
+    @echo " 3. Create annotated tag v{{version}}"
+    @echo " 4. Push commit + tag to GitHub"
+
+# Clean old tag + artifacts then release
+release-clean:
+    @echo "🧹 Preparing fresh release for v{{version}}..."
+    just clean-release-artifacts
+    
+    @echo "→ Removing old git tag (local and remote)..."
+    git tag -d "v{{version}}" 2>/dev/null && echo "→ Local tag v{{version}} deleted" || echo "→ No local tag found"
+    git push origin --delete "v{{version}}" 2>/dev/null && echo "→ Remote tag v{{version}} deleted" || echo "→ No remote tag found"
+    
+    @echo ""
+    @echo "🚀 Starting clean release..."
+    just release
 
 # Create release: commit + tag + push
 release:
     @echo "=== Preparing release v{{version}} ==="
     just pre-commit
-    
+   
     @echo "Committing Cargo.lock (if there are changes)..."
     git add Cargo.lock
     git commit -m "chore: update Cargo.lock for v{{version}}" || echo "→ No changes to Cargo.lock"
-    
+   
     @echo "Creating git tag v{{version}}..."
     git tag -a "v{{version}}" -m "Release v{{version}}"
-    
+   
     @echo "Pushing commit and tag..."
     git push origin main --follow-tags
-    
+   
     @echo ""
     @echo "🎉 Release v{{version}} created and pushed successfully!"
 
@@ -160,11 +180,3 @@ release:
 release-local:
     just build-release-strict
     cargo install --path . --locked
-
-# Clean release - remove old tag if it exists
-release-clean:
-    @echo "Cleaning up old tag v{{version}}..."
-    git tag -d "v{{version}}" 2>/dev/null || echo "→ Tag não existe localmente"
-    git push origin --delete "v{{version}}" 2>/dev/null || echo "→ Tag não existe no GitHub"
-    @echo "Agora rodando release..."
-    just release
