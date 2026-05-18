@@ -1,5 +1,5 @@
-// /src/cli/args.rs
 
+// src/cli/args.rs
 #![allow(clippy::struct_excessive_bools)]
 
 use clap::Parser;
@@ -15,6 +15,9 @@ use super::config::Config;
   ruslink nvim --git --message \"Update neovim\"
   ruslink nvim --restow --force
   ruslink nvim --dry-run -v
+  ruslink list
+  ruslink status
+  ruslink clean --dry-run
 
 MERGE MODE:
   ruslink base --target ~
@@ -26,8 +29,8 @@ DOTFILES MODE:
   ruslink nvim --dotfiles --merge --merge-append
   ruslink shell --dotfiles --dry-run -v")]
 struct Args {
-    /// Package name to manage
-    package: String,
+    /// Package name (optional for list/status/clean)
+    package: Option<String>,
 
     /// Stow directory
     #[arg(short = 'd', long)]
@@ -36,6 +39,18 @@ struct Args {
     /// Target directory
     #[arg(short = 't', long)]
     target: Option<PathBuf>,
+
+    /// List available packages
+    #[arg(long)]
+    list: bool,
+
+    /// Show detailed status
+    #[arg(long)]
+    status: bool,
+
+    /// Clean broken symlinks, empty dirs and old backups
+    #[arg(long)]
+    clean: bool,
 
     /// Delete/unstow only
     #[arg(short = 'D', long)]
@@ -97,9 +112,7 @@ struct Args {
     #[arg(long)]
     show_merge_history: bool,
 
-    /// Enable dotfiles mode (rename dot- prefix to .)
-    /// Transforms files like 'dot-bashrc' to '.bashrc' during stow
-    /// Example: dotfiles/bash/dot-bashrc → ~/.bashrc
+    /// Enable dotfiles mode
     #[arg(long)]
     dotfiles: bool,
 }
@@ -112,9 +125,7 @@ pub fn parse_args() -> Config {
         .unwrap_or_else(|| std::env::current_dir().expect("Failed to get current dir"));
 
     let target_dir = args.target.unwrap_or_else(|| {
-        stow_dir
-            .parent()
-            .map_or_else(|| PathBuf::from("/"), PathBuf::from)
+        stow_dir.parent().map_or_else(|| PathBuf::from("/"), PathBuf::from)
     });
 
     let mut merge_settings = crate::stow::MergeConfig::default();
@@ -128,9 +139,13 @@ pub fn parse_args() -> Config {
     }
 
     Config {
-        package: args.package,
+        package: args.package.unwrap_or_default(),
         stow_dir,
         target_dir,
+
+        list: args.list,
+        status: args.status,
+        clean: args.clean,
 
         delete: args.delete,
         restow: args.restow,
@@ -152,7 +167,6 @@ pub fn parse_args() -> Config {
         merge_settings,
 
         show_merge_history: args.show_merge_history,
-
         dotfiles: args.dotfiles,
     }
 }
