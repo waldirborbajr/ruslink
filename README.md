@@ -12,6 +12,21 @@
 
 A lightweight, production-ready Rust-based stow utility for managing dotfiles and package-style deployments with advanced features like merge mode, git integration, and intelligent conflict resolution.
 
+---
+
+## Why ruslink?
+
+| Feature                      | GNU Stow     | ruslink              | Advantage                 |
+|------------------------------|--------------|----------------------|---------------------------|
+| Git Integration              | Weak         | **Native & Automatic** | Superior experience       |
+| Config file merging          | Not supported| **Intelligent Merge**   | Key differentiator        |
+| Dry-run + Logging            | Basic        | **Excellent**           | Much safer                |
+| Performance                  | Good         | **Excellent** (Rust)    | Lightweight binaries      |
+| Windows Support              | Poor         | Good                    | Cross-platform            |
+| Modern UX                    | Outdated     | **Modern**              | Easy to use               |
+
+---
+
 ## Table of Contents
 
 - [Features](#features)
