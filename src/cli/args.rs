@@ -19,7 +19,12 @@ use super::config::Config;
 MERGE MODE:
   ruslink base --target ~
   ruslink dev --target ~ --merge --merge-append
-  ruslink gui --target ~ --merge --merge-append --merge-extensions .bashrc,.zshrc")]
+  ruslink gui --target ~ --merge --merge-append --merge-extensions .bashrc,.zshrc
+
+DOTFILES MODE:
+  ruslink bash --dotfiles
+  ruslink nvim --dotfiles --merge --merge-append
+  ruslink shell --dotfiles --dry-run -v")]
 struct Args {
     /// Package name to manage
     package: String,
@@ -91,6 +96,12 @@ struct Args {
     /// Show merge history
     #[arg(long)]
     show_merge_history: bool,
+
+    /// Enable dotfiles mode (rename dot- prefix to .)
+    /// Transforms files like 'dot-bashrc' to '.bashrc' during stow
+    /// Example: dotfiles/bash/dot-bashrc → ~/.bashrc
+    #[arg(long)]
+    dotfiles: bool,
 }
 
 pub fn parse_args() -> Config {
@@ -141,5 +152,7 @@ pub fn parse_args() -> Config {
         merge_settings,
 
         show_merge_history: args.show_merge_history,
+
+        dotfiles: args.dotfiles,
     }
 }

@@ -35,6 +35,10 @@ pub fn run() -> Result<()> {
 
     info!("Target dir  : {}", config.target_dir.display());
 
+    if config.dotfiles {
+        info!("Dotfiles    : enabled (dot- prefix → .)");
+    }
+
     if config.dry_run {
         warning("*** DRY RUN MODE ENABLED ***");
     }

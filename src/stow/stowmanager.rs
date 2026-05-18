@@ -12,6 +12,39 @@ use super::merge::{MergeAction, MergeHandler};
 use crate::cli::Config;
 use crate::utils::should_ignore;
 
+// ====================== DOTFILES HANDLING ======================
+
+/// Transforma paths com prefixo 'dot-' em paths com prefixo '.'
+/// Exemplo: "dot-bashrc" → ".bashrc"
+///          "dot-config/fish" → ".config/fish"
+fn transform_dot_prefix(path: &Path) -> PathBuf {
+    let mut components = Vec::new();
+
+    for comp in path.components() {
+        match comp {
+            std::path::Component::Normal(os_str) => {
+                let name = os_str.to_string_lossy();
+                if let Some(stripped) = name.strip_prefix("dot-") {
+                    components.push(format!(".{stripped}"));
+                } else {
+                    components.push(name.into_owned());
+                }
+            }
+            std::path::Component::ParentDir => {
+                components.push("..".to_string());
+            }
+            // Ignore current dir and handle the rest by re-emitting
+            std::path::Component::CurDir => {}
+            _ => {
+                // RootDir, Prefix, etc.
+                components.push(comp.as_os_str().to_string_lossy().into_owned());
+            }
+        }
+    }
+
+    components.iter().collect()
+}
+
 #[derive(Debug, Default)]
 pub struct StowStats {
     pub files_linked: usize,
@@ -126,7 +159,14 @@ fn visit_source(
             continue;
         }
 
-        let destination = target_base.join(rel_path);
+        // Aplicar transformação dot- se dotfiles mode está habilitado
+        let destination_rel_path = if config.dotfiles {
+            transform_dot_prefix(rel_path)
+        } else {
+            rel_path.to_path_buf()
+        };
+
+        let destination = target_base.join(&destination_rel_path);
 
         if entry.file_type()?.is_dir() {
             if !config.dry_run {
@@ -251,7 +291,14 @@ fn visit_unstow(
             continue;
         }
 
-        let destination = target_base.join(rel_path);
+        // Aplicar transformação dot- se dotfiles mode está habilitado
+        let destination_rel_path = if config.dotfiles {
+            transform_dot_prefix(rel_path)
+        } else {
+            rel_path.to_path_buf()
+        };
+
+        let destination = target_base.join(&destination_rel_path);
 
         if entry.file_type()?.is_dir() {
             visit_unstow(root, &path, target_base, config, ignores, stats)?;

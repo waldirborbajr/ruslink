@@ -42,6 +42,10 @@ pub struct Config {
 
     /// Show merge history
     pub show_merge_history: bool,
+
+    // ─── Dotfiles mode ────────────────────────────────────────
+    /// Enable dotfiles mode (dot- prefix → .)
+    pub dotfiles: bool,
 }
 
 impl Config {

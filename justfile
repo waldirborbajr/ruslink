@@ -179,7 +179,3 @@ release-local:
     just build-release-strict
     cargo install --path . --locked
     @echo "✅ ruslink installed locally from source (for testing)"
-
-# Hidden helper (kept for internal use)
-build-release-strict:
-    cargo build --release --locked
