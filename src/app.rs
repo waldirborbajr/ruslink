@@ -5,7 +5,9 @@ use tracing::{debug, info};
 
 use crate::cli::parse_args;
 use crate::git::handle_git_operations;
-use crate::stow::{stow_package, unstow_package, StowStats, list_packages, show_status, clean_target};
+use crate::stow::{
+    clean_target, list_packages, show_status, stow_package, unstow_package, StowStats,
+};
 use crate::utils::{
     confirm_action, error, load_all_ignore_patterns, setup_tracing, success, warning,
 };
@@ -69,7 +71,10 @@ pub fn run() -> Result<()> {
             std::process::exit(0);
         }
 
-        if (config.force || config.adopt) && !config.delete && !confirm_action("FORCE / ADOPT", &config) {
+        if (config.force || config.adopt)
+            && !config.delete
+            && !confirm_action("FORCE / ADOPT", &config)
+        {
             warning("Operation cancelled by user.");
             std::process::exit(0);
         }
@@ -80,7 +85,8 @@ pub fn run() -> Result<()> {
     // UNSTOW
     if config.restow || config.delete {
         info!("Unstowing package '{}'...", config.package);
-        let unstow_stats = unstow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
+        let unstow_stats =
+            unstow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
         total_stats.files_removed = unstow_stats.files_removed;
     }
 

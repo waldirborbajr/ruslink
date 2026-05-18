@@ -1,4 +1,3 @@
-
 // src/cli/args.rs
 #![allow(clippy::struct_excessive_bools)]
 
@@ -125,7 +124,9 @@ pub fn parse_args() -> Config {
         .unwrap_or_else(|| std::env::current_dir().expect("Failed to get current dir"));
 
     let target_dir = args.target.unwrap_or_else(|| {
-        stow_dir.parent().map_or_else(|| PathBuf::from("/"), PathBuf::from)
+        stow_dir
+            .parent()
+            .map_or_else(|| PathBuf::from("/"), PathBuf::from)
     });
 
     let mut merge_settings = crate::stow::MergeConfig::default();

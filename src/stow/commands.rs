@@ -70,7 +70,8 @@ pub fn clean_target(target_dir: &Path, config: &Config) -> Result<()> {
         let path = entry.path();
 
         // Broken symlink
-        if path.symlink_metadata()
+        if path
+            .symlink_metadata()
             .is_ok_and(|m| m.file_type().is_symlink())
             && !path.exists()
         {
