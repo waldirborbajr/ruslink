@@ -41,13 +41,13 @@ help:
     @echo " just check-lock           → Verify Cargo.lock consistency"
     @echo " just build-release-strict → Build with --locked (CI-like)"
     @echo " just clean                → Cargo clean"
-    @echo " just clean-release-artifacts → Remove release binaries"
+    @echo " just clean-release-artifacts → Remove local release artifacts"
     @echo ""
     @echo "=== Release ==="
-    @echo " just release-dry-run      → Show what the release will do (safe)"
-    @echo " just release              → Create git tag + GitHub Release with changelog"
-    @echo " just release-clean        → Delete old release + artifacts then release"
-    @echo " just release-local        → Build and install locally"
+    @echo " just release-dry-run      → Preview release"
+    @echo " just release              → Create tag + push (triggers GitHub CI)"
+    @echo " just release-clean        → Delete old release + create new one"
+    @echo " just release-local        → Build and install locally (for testing)"
     @echo ""
 
 # ─── Build & Development ───────────────────────────────────────
@@ -124,30 +124,22 @@ clean:
 cache:
     cargo-cache --remove-dir all || echo "cargo-cache not installed (optional)"
 
-# ─── Release Artifacts Cleanup ─────────────────────────────────
+# ─── Release Artifacts Cleanup (local only) ────────────────────
 clean-release-artifacts:
-    @echo "🧹 Cleaning release artifacts..."
+    @echo "🧹 Cleaning local release artifacts..."
     rm -rf target/release/ruslink target/release/ruslink.exe 2>/dev/null || true
     rm -rf target/release/*.tar.gz target/release/*.zip 2>/dev/null || true
-    @echo "→ Release binaries and packages removed"
+    @echo "→ Local artifacts removed"
 
 # ─── Release ───────────────────────────────────────────────────
 version := `grep "^version" Cargo.toml | awk -F'"' '{print $2}' | head -n1`
 
-# Generate changelog from commits since last tag
-changelog:
-    @echo "📜 Generating changelog for v{{version}}..."
-    @git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 2>/dev/null || echo "")..HEAD > CHANGELOG.tmp 2>/dev/null || echo "- Initial release" > CHANGELOG.tmp
-    @cat CHANGELOG.tmp
-
-# Dry run
 release-dry-run:
-    @echo "Current version → {{version}}"
-    @echo "Tag            → v{{version}}"
+    @echo "Current version in Cargo.toml → {{version}}"
+    @echo "Tag that will be created     → v{{version}}"
     @echo ""
-    just changelog
+    @echo "This will trigger the GitHub Actions workflow to build official binaries."
 
-# Clean previous release + artifacts then create new one
 release-clean:
     @echo "🧹 Preparing fresh release for v{{version}}..."
 
@@ -163,7 +155,6 @@ release-clean:
     @echo "🚀 Starting clean release..."
     just release
 
-# Main release with changelog
 release:
     @echo "=== Preparing release v{{version}} ==="
     
@@ -173,26 +164,18 @@ release:
     git add Cargo.lock
     git commit -m "chore: update Cargo.lock for v{{version}}" || echo "→ No changes to Cargo.lock"
 
-    @echo "Generating changelog..."
-    just changelog
-
-    @echo "Creating annotated tag..."
+    @echo "Creating annotated tag v{{version}}..."
     git tag -a "v{{version}}" -m "Release v{{version}}"
 
-    @echo "Pushing commit and tag..."
+    @echo "Pushing commit and tag to GitHub..."
     git push origin main --follow-tags
 
-    @echo "Creating GitHub Release with changelog..."
-    gh release create "v{{version}}" \
-        --title "v{{version}}" \
-        --notes-file CHANGELOG.tmp \
-        --latest
-
     @echo ""
-    @echo "🎉 Release v{{version}} created successfully on GitHub!"
-    @rm -f CHANGELOG.tmp
+    @echo "🎉 Tag v{{version}} pushed successfully!"
+    @echo "→ GitHub Actions is now building the official binaries and creating the release."
 
-# Local install
+# Local install (for testing only)
 release-local:
     just build-release-strict
     cargo install --path . --locked
+    @echo "✅ ruslink installed locally from source (for testing)"
