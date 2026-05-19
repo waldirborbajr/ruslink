@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,6 +38,7 @@ jobs:
           name: ruslink ${{ steps.get_version.outputs.version }}
           draft: false
           prerelease: false
+          make_latest: true                    # ← Marca como Latest
           generate_release_notes: true
           body: |
             **ruslink** ${{ steps.get_version.outputs.version }}
@@ -125,3 +127,4 @@ jobs:
             ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}.tar.gz.sha256
             ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}.zip
             ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}.zip.sha256
+          make_latest: true                    # ← Reforço de consistência
