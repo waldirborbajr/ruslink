@@ -46,7 +46,7 @@ help:
     @echo "=== Release ==="
     @echo " just release-dry-run      → Preview release"
     @echo " just release              → Create tag + push (triggers GitHub CI)"
-    @echo " just release-clean        → Delete old release + create new one"
+    @echo " just release-clean        → Delete old release + tag and create new one"
     @echo " just release-local        → Build and install locally (for testing)"
     @echo ""
 
@@ -132,44 +132,53 @@ clean-release-artifacts:
     @echo "→ Local artifacts removed"
 
 # ─── Release ───────────────────────────────────────────────────
+# Extracts version from Cargo.toml
 version := `grep "^version" Cargo.toml | awk -F'"' '{print $2}' | head -n1`
 
 release-dry-run:
     @echo "Current version in Cargo.toml → {{version}}"
-    @echo "Tag that will be created     → v{{version}}"
+    @echo "Tag that will be created → v{{version}}"
     @echo ""
     @echo "This will trigger the GitHub Actions workflow to build official binaries."
 
+# Deletes the GitHub Release and tag (both remote and local) for the current version
+# Only affects the version defined in Cargo.toml — safe for old versions
 release-clean:
     @echo "🧹 Preparing fresh release for v{{version}}..."
-
     just clean-release-artifacts
-
-    @echo "→ Deleting old GitHub Release and tag..."
-    gh release delete "v{{version}}" --yes --cleanup-tag 2>/dev/null && echo "→ Old release deleted" || echo "→ No previous release found"
-
-    @echo "→ Deleting local tag..."
-    git tag -d "v{{version}}" 2>/dev/null && echo "→ Local tag deleted" || echo "→ No local tag"
-
+    
+    @echo "→ Deleting remote GitHub Release and tag (v{{version}})..."
+    gh release delete "v{{version}}" --yes --cleanup-tag 2>/dev/null \
+        && echo "   → Remote release + tag deleted" \
+        || echo "   → No previous remote release found"
+    
+    @echo "→ Deleting local tag (v{{version}})..."
+    git tag -d "v{{version}}" 2>/dev/null \
+        && echo "   → Local tag deleted" \
+        || echo "   → No local tag found"
+    
+    @echo "→ Fetching latest tags from remote..."
+    git fetch --tags --force
+    
     @echo ""
     @echo "🚀 Starting clean release..."
     just release
 
 release:
     @echo "=== Preparing release v{{version}} ==="
-    
+   
     just pre-commit
-
+    
     @echo "Committing Cargo.lock (if changed)..."
     git add Cargo.lock
     git commit -m "chore: update Cargo.lock for v{{version}}" || echo "→ No changes to Cargo.lock"
-
+    
     @echo "Creating annotated tag v{{version}}..."
     git tag -a "v{{version}}" -m "Release v{{version}}"
-
+    
     @echo "Pushing commit and tag to GitHub..."
     git push origin main --follow-tags
-
+    
     @echo ""
     @echo "🎉 Tag v{{version}} pushed successfully!"
     @echo "→ GitHub Actions is now building the official binaries and creating the release."
