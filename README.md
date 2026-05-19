@@ -69,6 +69,8 @@
 
 - [Features](#features)
 - [Installation](#installation)
+  - [Build with Cargo](#build-with-cargo)
+  - [Build with just](#build-with-just)
 - [Quick Start](#quick-start)
 - [Complete Command Reference](#complete-command-reference)
 - [Usage Guide](#usage-guide)
@@ -77,12 +79,19 @@
   - [Git Integration](#git-integration)
   - [Conflict Resolution](#conflict-resolution)
   - [Dry Run & Safety](#dry-run--safety)
+- [Development Guide](#development-guide)
+  - [Development Commands](#development-commands)
+  - [Quality & Testing](#quality--testing)
+  - [Release Workflow](#release-workflow)
 - [Configuration](#configuration)
 - [Error Handling & Logging](#error-handling--logging)
 - [Project Structure](#project-structure)
 - [Build Options](#build-options)
 - [Examples](#examples)
+- [Contributing](#contributing)
 - [License](#license)
+
+---
 
 ## Installation
 
@@ -102,27 +111,19 @@ We provide a `justfile` for convenient development and building:
 # Show all available commands
 just help
 
-# Development
-just build          # Watch + build (default features)
-just run            # Watch + run
+# Development (watch + build with default features)
+just build              # or: just b
+just run                # or: just r
 
-# Feature Builds
-just build-minimal          # Build without git and colors
-just build-no-git           # Build with colors but no git
-just build-no-colors        # Build with git but no colors
-just build-release          # Release build (all features)
-just build-release-minimal  # Smallest possible binary
-
-# Quality Assurance
-just lint           # fmt + fmt --check + clippy
-just test           # Run tests
-
-# Maintenance
-just release        # Build release + install locally
-just update         # Update deps + clear cache
-just clean          # Cargo clean
-just size           # Show binary sizes
+# Feature-specific builds
+just build-minimal                  # No git, no colors (smallest binary)
+just build-no-git                   # With colors, no git integration
+just build-no-colors                # With git, no colors
+just build-release                  # Full features, optimized
+just build-release-minimal          # Smallest possible binary (optimized)
 ```
+
+---
 
 ## Quick Start
 
@@ -446,6 +447,172 @@ ruslink dev --merge --merge-append --dry-run -v --target ~
 
 ---
 
+## Development Guide
+
+### Development Commands
+
+The `justfile` provides convenient shortcuts for developers. Use `just help` or `just` to see all available commands.
+
+#### Building
+
+```bash
+# Watch-based development builds (default features)
+just build              # Continuous build with cargo watch
+just b                  # Short alias
+
+# Watch-based run (development)
+just run                # Continuous run with cargo watch
+just r                  # Short alias
+```
+
+#### Feature-Specific Builds
+
+```bash
+# Minimal build (no git, no colors)
+just build-minimal
+# Dependencies: only anyhow, clap, regex, tracing, tracing-subscriber, pathdiff, once_cell, walkdir
+# Size: ~3-4 MB
+
+# Build with colors only (no git)
+just build-no-git
+# Dependencies: colored
+# Size: ~4-5 MB
+
+# Build with git only (no colors)
+just build-no-colors
+# Dependencies: chrono
+# Size: ~4-5 MB
+
+# Release build (all features, optimized)
+just build-release
+# Size: ~5-8 MB
+# Optimizations: LTO, strip, panic=abort
+
+# Release minimal (smallest possible)
+just build-release-minimal
+# Size: ~3-4 MB
+# Smallest binary for deployment
+```
+
+### Quality & Testing
+
+#### Code Formatting & Linting
+
+```bash
+# Format all code
+just fmt
+# Runs: cargo fmt --all
+
+# Check formatting without modifying
+just fmt-check
+# Runs: cargo fmt --all -- --check
+
+# Run clippy with warnings as errors
+just clippy
+# Runs: cargo clippy --all-targets --all-features -- -D warnings
+
+# Auto-fix clippy suggestions
+just clippy-fix
+# Runs: cargo clippy --fix --allow-dirty --allow-staged
+
+# Full linting (format check + clippy)
+just lint
+# Runs: fmt-check + clippy
+
+# Cargo check (compilation check)
+just check
+# Runs: cargo check --all-targets --all-features
+```
+
+#### Testing
+
+```bash
+# Run all tests with output
+just test
+# Runs: cargo test --all-features -- --nocapture
+# Captures stdout/stderr for debugging
+```
+
+### Release Workflow
+
+#### Pre-release Preparation
+
+```bash
+# Format code
+just fmt
+
+# Run full linting
+just lint
+
+# Update dependencies and clear cache
+just update
+# Runs: cargo update && cargo-cache --remove-dir all
+
+# Verify Cargo.lock consistency
+just check-lock
+# Runs: cargo check --locked
+
+# Full pre-commit preparation
+just pre-commit
+# Runs: fmt + lint + update + check-lock
+# Outputs: "🎉 Pre-commit checks completed! Ready to commit."
+```
+
+#### Release Process
+
+```bash
+# Preview what release will do (shows version)
+just release-dry-run
+# Displays: Current version, Tag name, explains GitHub Actions trigger
+
+# Create new release (standard workflow)
+just release
+# 1. Runs pre-commit checks
+# 2. Commits Cargo.lock (if changed)
+# 3. Creates annotated git tag (v{version})
+# 4. Pushes commit and tag to origin/main
+# 5. Triggers GitHub Actions for building official binaries
+# Status: "🎉 Tag v{version} pushed successfully!"
+
+# Clean release (delete old release + create new)
+just release-clean
+# 1. Cleans local artifacts
+# 2. Deletes old GitHub Release and tag
+# 3. Deletes local git tag
+# 4. Starts fresh release process
+
+# Install locally from source (for testing)
+just release-local
+# 1. Builds release binary with --locked
+# 2. Installs via: cargo install --path . --locked
+# Useful for testing before official release
+```
+
+#### Maintenance Tasks
+
+```bash
+# Clean all build artifacts
+just clean
+# Runs: cargo clean
+
+# Remove local release artifacts
+just clean-release-artifacts
+# Removes: target/release/ruslink, *.tar.gz, *.zip
+
+# Build with --locked (CI-like, strict)
+just build-release-strict
+# Requires Cargo.lock to match Cargo.toml exactly
+# Used in CI to ensure reproducible builds
+
+# Update dependencies
+just update
+# Runs: cargo update (updates Cargo.lock)
+# Then: cargo-cache --remove-dir all (clears cache)
+# Output: "✅ Dependencies updated and Cargo.lock regenerated!"
+```
+
+---
+
 ## Configuration
 
 ### Ignore Patterns
@@ -688,6 +855,8 @@ ruslink nvim --dry-run -v --force --dir ~/.dotfiles --target ~
 - **When Dry-Run is Enabled** — Git auto-commit is automatically disabled for safety
 - **Multiple Packages** — Use merge mode to combine shell configs from different packages
 - **Dotfiles Naming** — Start files with `dot-` to enable automatic `.` prefix transformation
+- **Development** — Use `just` commands for consistency: `just fmt` before `just lint` before `just test`
+- **Pre-commit** — Run `just pre-commit` before pushing commits to ensure quality
 
 ---
 
@@ -727,15 +896,52 @@ ruslink clean --dir ~/.dotfiles --target ~ --dry-run -v
 ruslink clean --dir ~/.dotfiles --target ~
 ```
 
+### Linting Failures During Development
+
+```bash
+# Auto-fix formatting issues
+just fmt
+
+# Auto-fix clippy suggestions
+just clippy-fix
+
+# Full linting check
+just lint
+
+# If linting fails, check full output
+just clippy
+```
+
 ---
 
 ## Contributing
 
 Contributions are welcome! Please ensure:
-- Code passes `just lint`
-- Tests pass with `just test`
+
+```bash
+# Before submitting a PR:
+
+# 1. Format your code
+just fmt
+
+# 2. Run full linting
+just lint
+
+# 3. Run tests
+just test
+
+# 4. Optional: Use pre-commit to verify everything
+just pre-commit
+
+# 5. Update documentation if needed
+```
+
+Guidelines:
+- Code must pass `just lint` without warnings
+- Tests must pass with `just test`
 - Documentation is updated
 - All features are tested
+- Commit messages follow conventional commits format
 
 ---
 
