@@ -16,38 +16,52 @@
 
 ## Why ruslink?
 
-| Feature                        | GNU Stow           | ruslink                          | Advantage |
-|-------------------------------|--------------------|----------------------------------|---------|
-| **Language & Performance**    | Perl               | **Rust** (fast, small binary)    | ★★★★★ |
-| **Merge Mode**                | Not supported      | **Intelligent append + markers** | ★★★★★ |
-| **Git Integration**           | None               | **Native auto-commit & push**    | ★★★★★ |
-| **Dotfiles Mode** (`dot-*`)   | Manual / hacky     | **Built-in & seamless**          | ★★★★ |
-| **Conflict Handling**         | Fail / `--adopt`   | Force, Adopt, Backup, **Merge**  | ★★★★★ |
-| **Dry Run & Safety**          | Basic              | **Excellent** with detailed logs | ★★★★ |
-| **User Experience**           | Outdated           | Modern, colorful, clear messages | ★★★★★ |
-| **Windows Support**           | Poor               | Good (native symlinks)           | ★★★★ |
-| **Binary Size**               | Depends on Perl    | **~3–8 MB** (static)             | ★★★★ |
-| **Maintenance**               | Low                | **Active development**           | ★★★★ |
+### Comprehensive Feature Comparison
 
-**ruslink = GNU Stow + Modern Features + Battery Included**
+| Feature | GNU Stow | Chezmoi | **ruslink** |
+|---------|----------|---------|------------|
+| **Language & Performance** | Perl (slow) | Go (fast) | **Rust** (fastest, smallest) |
+| **Merge Mode** | ❌ Not supported | ⚠️ Limited | ✅ **Intelligent append + markers** |
+| **Git Integration** | ❌ None | ✅ Yes | ✅ **Native auto-commit & push** |
+| **Dotfiles Mode** | ❌ Manual / hacky | ✅ Yes | ✅ **Built-in & seamless** |
+| **Conflict Handling** | ⚠️ Fail only / `--adopt` | ✅ Multiple strategies | ✅ **Force, Adopt, Backup, Merge** |
+| **Dry Run & Safety** | ✅ Basic | ✅ Yes | ✅ **Excellent with detailed logs** |
+| **User Experience** | ❌ Outdated | ✅ Modern | ✅ **Modern, colorful, clear messages** |
+| **Windows Support** | ⚠️ Poor (WSL mainly) | ✅ Native | ✅ **Native symlinks support** |
+| **Binary Size** | Perl dependency | ~10-15 MB | **~3–8 MB** (static) |
+| **Installation** | System package manager | Go required | **Single static binary** |
+| **Learning Curve** | Moderate | Steep | ⭐ **Minimal - just like Stow** |
+| **Active Development** | ⚠️ Minimal | ✅ Active | ✅ **Active development** |
+| **Built-in Commands** | `stow` / `unstow` | `init` / `add` / `apply` | **stow, unstow, list, status, clean** |
+| **Configuration File** | ❌ No | ✅ TOML/YAML | ⏳ Planned |
+| **Hooks/Scripts** | ⚠️ Limited | ✅ Advanced | ⏳ Planned |
+
+**Key Takeaway:** 
+- **Choose GNU Stow** if you want simplicity and minimal dependencies
+- **Choose Chezmoi** if you need advanced templating and encryption
+- **Choose ruslink** if you want Stow's simplicity + modern features (merge, git, dotfiles) + blazing speed
 
 ---
 
 ## Features
 
-### Core
-- Symlink-based package management (just like Stow)
+### Core Functionality ✅
+- Symlink-based package management (just like GNU Stow)
 - Full support for `.gitignore` and `.ruslink.ignore`
-- `--dry-run`, `--force`, `--backup`, `--adopt`
+- Safe operations with `--dry-run` previews
 - Dotfiles mode: `dot-bashrc` → `.bashrc`, `dot-config/nvim` → `.config/nvim`
+- Conflict resolution: `--force`, `--backup`, `--adopt`, `--merge`
+- Package introspection: `list` and `status` commands
+- Clean up broken symlinks and empty directories
 
-### Advanced
+### Advanced Features 🚀
 - **Merge Mode** — intelligently merge shell configs (`.bashrc`, `.zshrc`, `.fish/config.fish`, etc.)
 - **Git Integration** — automatic commit and optional push after stowing
-- **Clean command** — remove broken symlinks and empty directories
-- **Status & List** — overview of your packages
-- Interactive confirmations for destructive actions
-- Structured logging with `-v`
+- **Interactive Confirmations** — user prompts for destructive actions
+- **Structured Logging** — debug-level insights with `-v` flag
+- **Human-Friendly Errors** — clear, actionable error messages
+- **Optional Colors** — beautiful output with conditional color support
+- **Feature Flags** — build minimal binaries for constrained environments
 
 ---
 
@@ -56,43 +70,19 @@
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Complete Command Reference](#complete-command-reference)
 - [Usage Guide](#usage-guide)
   - [Basic Operations](#basic-operations)
   - [Merge Mode](#merge-mode)
   - [Git Integration](#git-integration)
   - [Conflict Resolution](#conflict-resolution)
   - [Dry Run & Safety](#dry-run--safety)
-- [Command Reference](#command-reference)
 - [Configuration](#configuration)
 - [Error Handling & Logging](#error-handling--logging)
 - [Project Structure](#project-structure)
 - [Build Options](#build-options)
+- [Examples](#examples)
 - [License](#license)
-
-## Features
-
-### Core Functionality
-- ✅ Stow packages into target locations using symlinks
-- ✅ Unstow and restow packages with a single command
-- ✅ Respects `.gitignore` and `.ruslink.ignore` patterns
-- ✅ Force overwrite existing destination files
-- ✅ Backup existing files before overwriting/removing them
-- ✅ Adopt mode to replace existing files with symlinks
-
-### Advanced Features
-- 🔀 **Merge Mode** - Intelligently merge multiple packages with conflict resolution
-  - Content append for shell config files (`.bashrc`, `.zshrc`, `.fish/config.fish`)
-  - Directory merging for recursive stowing
-  - Merge history tracking with audit logs
-- 🔧 **Git Integration** - Automatic commit and push after deployments
-  - Auto-commit with custom messages
-  - Optional git push to remote
-  - Smart commit message sanitization
-- 🎯 **Dry-run Mode** - Safe preview of all changes before execution
-- 📊 **Structured Logging** - Debug-level insights with the `-v` flag
-- ⚠️ **Interactive Confirmation** - User prompts for destructive actions
-- 💾 **Human-friendly Errors** - Clear, actionable error messages on failures
-- 🌈 **Optional Colors** - Beautiful output with conditional color support
 
 ## Installation
 
@@ -139,17 +129,23 @@ just size           # Show binary sizes
 ### Basic Setup
 
 ```bash
-# Stow a package into your home directory
-ruslink home --dir ~/.dotfiles --target ~
+# List available packages
+ruslink list --dir ~/.dotfiles
 
-# Preview changes without applying them
+# Preview stowing
 ruslink home --dir ~/.dotfiles --target ~ --dry-run -v
+
+# Stow a package
+ruslink home --dir ~/.dotfiles --target ~
 
 # Unstow a package
 ruslink home --delete --dir ~/.dotfiles --target ~
 
-# Restow (unstow then stow again)
+# Restow (unstow then stow)
 ruslink home --restow --dir ~/.dotfiles --target ~
+
+# Show package status
+ruslink status home --dir ~/.dotfiles --target ~
 ```
 
 ### With Git Integration
@@ -175,16 +171,178 @@ ruslink base --target ~
 ruslink dev --target ~ --merge --merge-append \
   --merge-extensions ".bashrc,.zshrc,.config/fish/config.fish"
 
-# Add GUI configuration, merging config files
+# Add GUI configuration
 ruslink gui --target ~ --merge --merge-append
 
 # View merge history
 ruslink gui --target ~ --show-merge-history
 ```
 
-**Merge Result Example:**
+### Dotfiles Mode
 
-After merging multiple packages, your `~/.bashrc` will contain:
+```bash
+# Transform dot-prefixed files
+ruslink bash --dotfiles
+# dot-bashrc → .bashrc, dot-config/nvim → .config/nvim
+
+# Combine with merge mode
+ruslink nvim --dotfiles --merge --merge-append
+```
+
+---
+
+## Complete Command Reference
+
+### Positional Arguments
+
+```
+PACKAGE_NAME (optional)  Package to stow (required for stow/unstow/status)
+                         Omit for list/clean/status
+```
+
+### Essential Options
+
+| Flag | Short | Type | Description |
+|------|-------|------|-------------|
+| `--dir` | `-d` | `PATH` | Stow directory (default: current directory) |
+| `--target` | `-t` | `PATH` | Target directory (default: parent of stow dir) |
+| `--dry-run` | `-n` | bool | Preview changes without applying them |
+| `--verbose` | `-v` | bool | Enable debug output (structured logging) |
+| `--yes` | `-y` | bool | Auto-confirm all prompts |
+
+### Commands
+
+| Flag | Short | Type | Description |
+|------|-------|------|-------------|
+| `--list` | - | bool | List all available packages |
+| `--status` | - | bool | Show detailed status of packages/links |
+| `--clean` | - | bool | Remove broken symlinks and empty directories |
+
+### Stow Operations
+
+| Flag | Short | Type | Description |
+|------|-------|------|-------------|
+| `--delete` | `-D` | bool | Delete/unstow only (remove symlinks) |
+| `--restow` | `-R` | bool | Restow (unstow then stow again) |
+
+### Conflict Resolution
+
+| Flag | Type | Description |
+|------|------|-------------|
+| `--force` | bool | Overwrite existing destination files |
+| `--backup` | bool | Create `*.bak` backups before modifying files |
+| `--adopt` | bool | Replace existing files with symlinks (adopt mode) |
+
+### Merge Mode
+
+| Flag | Type | Description |
+|------|------|-------------|
+| `--merge` | bool | Enable merge mode for multiple packages |
+| `--merge-append` | bool | Append content to mergeable files (shell configs) |
+| `--merge-extensions` | `LIST` | Comma-separated extensions to merge (e.g., `.bashrc,.zshrc`) |
+| `--show-merge-history` | bool | Display merge operation audit log |
+
+### Git Integration
+
+| Flag | Type | Description |
+|------|------|-------------|
+| `--git` | `-g` | bool | Auto-commit changes in git repository |
+| `--git-push` | bool | Push to remote after commit |
+| `--message` | `-m` | `STRING` | Custom git commit message |
+
+### Dotfiles Mode
+
+| Flag | Type | Description |
+|------|------|-------------|
+| `--dotfiles` | bool | Transform `dot-` prefixed files to `.` (dot-bashrc → .bashrc) |
+
+---
+
+## Usage Guide
+
+### Basic Operations
+
+#### List Packages
+
+```bash
+# Show all available packages
+ruslink list --dir ~/.dotfiles
+
+# Output:
+# Packages available in ~/.dotfiles:
+#   • nvim
+#   • bash
+#   • tmux
+# Total: 3 package(s)
+```
+
+#### Show Status
+
+```bash
+# Check if package is installed
+ruslink status nvim --dir ~/.dotfiles --target ~
+
+# Show summary (without package name)
+ruslink status --dir ~/.dotfiles --target ~
+```
+
+#### Stow
+
+```bash
+# Default stow (dir: current directory, target: parent)
+ruslink nvim
+
+# Explicit paths
+ruslink nvim --dir ~/.dotfiles --target ~
+```
+
+#### Unstow
+
+```bash
+# Remove symlinks for a package
+ruslink nvim --delete --dir ~/.dotfiles --target ~
+```
+
+#### Restow
+
+```bash
+# Unstow then stow again (useful for updates)
+ruslink nvim --restow --dir ~/.dotfiles --target ~
+```
+
+#### Clean
+
+```bash
+# Remove broken symlinks and empty directories
+ruslink clean --dir ~/.dotfiles --target ~ --dry-run -v
+
+# Actually clean (after previewing)
+ruslink clean --dir ~/.dotfiles --target ~
+```
+
+### Merge Mode
+
+Merge mode allows combining multiple packages with intelligent conflict resolution:
+
+```bash
+ruslink package --merge --merge-append \
+  --merge-extensions ".bashrc,.zshrc,.config/fish/config.fish"
+```
+
+**How it works:**
+- Files matching `--merge-extensions` are **appended** with markers
+- Directories are **merged** recursively
+- Conflicts require `--force`, `--adopt`, or explicit merge settings
+- All merges are logged to `.ruslink-merge-log` for audit
+
+**Default merge extensions:**
+- `.bashrc`, `.bash_profile`
+- `.zshrc`, `.profile`
+- `.fishrc`
+
+**Example merge result:**
+
+After merging multiple packages, `~/.bashrc` will contain:
 
 ```bash
 # Original base/.bashrc content
@@ -198,57 +356,12 @@ After merging multiple packages, your `~/.bashrc` will contain:
 # === ruslink [gui] (end) ===
 ```
 
-## Usage Guide
-
-### Basic Operations
+View history:
 
 ```bash
-ruslink <package> [OPTIONS]
+ruslink gui --show-merge-history --target ~
+# Output: ~/.ruslink-merge-log with timestamps and packages
 ```
-
-#### Simple Stow
-
-```bash
-# Stow 'home' package from current directory's parent
-ruslink home
-
-# Stow with explicit directories
-ruslink home --dir ~/.dotfiles --target ~
-```
-
-#### Unstow
-
-```bash
-# Remove symlinks created by ruslink
-ruslink home --delete --dir ~/.dotfiles --target ~
-```
-
-#### Restow
-
-```bash
-# Reinstall a package (unstow then stow)
-ruslink home --restow --dir ~/.dotfiles --target ~
-```
-
-### Merge Mode
-
-Merge mode allows you to combine multiple packages intelligently:
-
-```bash
-ruslink package --merge --merge-append \
-  --merge-extensions ".bashrc,.zshrc,.config/fish/config.fish"
-```
-
-**How it works:**
-- Files matching `--merge-extensions` are **appended** with markers
-- Directories are **merged** recursively
-- Conflicts require `--force`, `--adopt`, or explicit merge settings
-- All merges are logged for audit purposes
-
-**Supported merge extensions (default):**
-- `.bashrc`, `.bash_profile`
-- `.zshrc`, `.profile`
-- `.fishrc` and similar shell configs
 
 ### Git Integration
 
@@ -265,92 +378,73 @@ ruslink config --git --git-push
 
 **Features:**
 - Automatic `git add -A` before commit
-- Sanitized commit messages (max 100 chars)
+- Sanitized commit messages (max 100 chars first line)
 - Timestamps in automatic messages
 - Remote push support
-- Works only in actual git repositories
+- Auto-detects git repository (skips if not in git repo)
+
+**How it works:**
+1. If `--git` flag is set: uses custom message or default
+2. If `--git` not set but changes detected: creates silent auto-commit
+3. Commit message format (auto): `chore(package): auto-update configuration (YYYY-MM-DD HH:MM)`
 
 ### Conflict Resolution
 
-When files already exist at the destination, ruslink offers several strategies:
+When stowing encounters existing files:
 
-#### Default Behavior
+#### `--force` (Overwrite)
 ```bash
-# Fails with a clear error
-ruslink package --dir ~/.dotfiles --target ~
-# Error: Conflict: ~/.bashrc already exists (use --force or --adopt)
+ruslink nvim --force --dir ~/.dotfiles --target ~
+# Overwrites all existing files with symlinks
+# Add --backup to keep backups
 ```
 
-#### Force Overwrite
+#### `--adopt` (Adopt Mode)
 ```bash
-# Replace existing files (with optional backup)
-ruslink package --force
-ruslink package --force --backup  # Renames existing to *.bak
+ruslink nvim --adopt --dir ~/.dotfiles --target ~
+# Replaces existing files with symlinks (adopts them)
+# Useful when you have manual configs that should be managed
 ```
 
-#### Adopt Mode
+#### `--backup` (Safe Overwrite)
 ```bash
-# Replace existing file with symlink (no backup)
-ruslink package --adopt
+ruslink nvim --force --backup --dir ~/.dotfiles --target ~
+# Creates *.bak files before overwriting
+# Backup numbering: file.bak, file.bak1, file.bak2, ...
 ```
 
-#### Merge Mode
+#### `--merge` (Intelligent Merge)
 ```bash
-# Intelligently merge compatible files
-ruslink package --merge --merge-append \
-  --merge-extensions ".bashrc"
+ruslink nvim --merge --merge-append --dir ~/.dotfiles --target ~
+# Merges compatible files (shell configs) instead of overwriting
+# Fails on incompatible conflicts unless --force or --adopt used
 ```
 
 ### Dry Run & Safety
 
+Always preview before destructive operations:
+
 ```bash
-# Preview all changes without applying them
-ruslink package --dry-run -v
+# Preview stowing
+ruslink nvim --dry-run -v --dir ~/.dotfiles --target ~
 
-# Auto-confirm destructive actions (skip prompts)
-ruslink package --force --yes
+# Preview unstowing
+ruslink nvim --delete --dry-run -v --dir ~/.dotfiles --target ~
 
-# Backup before modifying
-ruslink package --force --backup
+# Preview cleanup
+ruslink clean --dry-run -v --dir ~/.dotfiles --target ~
+
+# Preview merge with details
+ruslink dev --merge --merge-append --dry-run -v --target ~
 ```
 
-## Command Reference
+**Dry-run behavior:**
+- Shows all operations that would be performed
+- No files are created, modified, or deleted
+- Git operations are skipped (for safety)
+- Interactive confirmations are still shown
 
-```
-USAGE:
-    ruslink <PACKAGE> [OPTIONS]
-
-ARGUMENTS:
-    <PACKAGE>               Package name to manage
-
-OPTIONS:
-    -d, --dir <DIR>         Stow directory (default: current working directory)
-    -t, --target <DIR>      Target directory (default: parent of --dir)
-    
-    -D, --delete            Unstow the package only
-    -R, --restow            Unstow then stow the package
-    -n, --dry-run           Simulate changes without applying them
-    
-    -v, --verbose           Enable debug output (structured logging)
-    -y, --yes               Auto-confirm all prompts
-    
-    -g, --git               Auto-commit changes in git repository
-    --git-push              Push to remote after commit
-    -m, --message <MSG>     Custom git commit message
-    
-    --force                 Overwrite existing destination files
-    --backup                Create *.bak backups before modifying
-    --adopt                 Replace existing files with symlinks
-    
-    --merge                 Enable merge mode
-    --merge-append          Append content to mergeable files
-    --merge-extensions <EXT> Comma-separated file extensions to append
-                            (e.g., ".bashrc,.zshrc")
-    --show-merge-history    Display merge operation log
-    
-    -h, --help              Show help message
-    --version               Show version
-```
+---
 
 ## Configuration
 
@@ -358,12 +452,12 @@ OPTIONS:
 
 ruslink automatically respects ignore patterns from:
 
-1. **`.gitignore`** - Standard git ignore file
-2. **`.ruslink.ignore`** - Custom ruslink-specific ignore patterns
+1. **`.gitignore`** — Standard git ignore file (in package directory)
+2. **`.ruslink.ignore`** — Custom ruslink-specific ignore patterns
 
 #### Default Ignored Patterns
 
-The following files and directories are always skipped:
+The following are always skipped:
 
 ```
 .git                    # Git metadata
@@ -372,7 +466,7 @@ The following files and directories are always skipped:
 .ruslink.ignore         # ruslink ignore files
 README*                 # Documentation
 LICENSE*                # License files
-COPYING*                # Copy right notices
+COPYING*                # Copyright notices
 .DS_Store               # macOS metadata
 *.bak                   # Backup files
 *.tmp                   # Temporary files
@@ -395,7 +489,7 @@ tmp/*
 
 ### Merge Configuration
 
-Merge behavior is controlled via command-line flags:
+Merge behavior is controlled via command-line flags (see [Merge Mode](#merge-mode)):
 
 ```bash
 # Enable merge mode with default extensions
@@ -406,7 +500,9 @@ ruslink package --merge --merge-append \
   --merge-extensions ".bashrc,.zshrc,.config/fish/config.fish"
 ```
 
-The merge history is automatically logged to `.ruslink-merge-log` in the stow directory.
+The merge history is logged to `.ruslink-merge-log` in the stow directory.
+
+---
 
 ## Error Handling & Logging
 
@@ -415,7 +511,7 @@ The merge history is automatically logged to `.ruslink-merge-log` in the stow di
 Enable detailed logging with `-v` or `--verbose`:
 
 ```bash
-ruslink nvim -v
+ruslink nvim -v --dir ~/.dotfiles --target ~
 ```
 
 Output includes:
@@ -424,13 +520,14 @@ Output includes:
 - File adoption/backup operations
 - Git operations and status
 - Pattern matching and ignore decisions
+- Merge operations with markers
 
 ### Human-Friendly Errors
 
 Instead of cryptic panic messages, ruslink provides clear, actionable errors:
 
 ```
-Error: Conflict: ~/.bashrc already exists (use --force or --adopt)
+Error: Conflict: ~/.bashrc already exists (use --force, --adopt, or --merge)
 
 Error: Package 'nvim' not found in ~/.dotfiles
 
@@ -447,7 +544,12 @@ cargo build --release --no-default-features --features git
 
 # Build with colors only
 cargo build --release --no-default-features --features colors
+
+# Minimal (no colors, no git)
+cargo build --release --no-default-features
 ```
+
+---
 
 ## Project Structure
 
@@ -466,6 +568,7 @@ src/
 ├── stow/
 │   ├── mod.rs           # Stow module exports
 │   ├── stowmanager.rs   # Stow/unstow implementation
+│   ├── commands.rs      # List/status/clean commands
 │   └── merge.rs         # Merge mode and conflict resolution
 └── utils/
     ├── mod.rs           # Utils module exports
@@ -477,11 +580,14 @@ src/
 
 ### Key Modules
 
-- **`app.rs`** - Orchestrates the stow/unstow workflow with logging
-- **`gitmanager.rs`** - Low-level git operations (add, commit, push)
-- **`stowmanager.rs`** - Core symlink creation and file management
-- **`merge.rs`** - Conflict detection and merge strategies
-- **`ignore.rs`** - Regex-based pattern matching with caching
+- **`app.rs`** — Orchestrates the stow/unstow/list/status/clean workflow with logging
+- **`gitmanager.rs`** — Low-level git operations (add, commit, push)
+- **`stowmanager.rs`** — Core symlink creation and file management
+- **`merge.rs`** — Conflict detection and intelligent merge strategies
+- **`ignore.rs`** — Regex-based pattern matching with caching
+- **`commands.rs`** — Introspection commands (list, status, clean)
+
+---
 
 ## Build Options
 
@@ -490,7 +596,8 @@ ruslink supports feature flags for minimal binary sizes:
 ### Default Build (All Features)
 ```bash
 cargo build --release
-# Includes: git, colors, tracing
+# Includes: git, colors
+# Size: ~5-8 MB
 ```
 
 ### Minimal Build
@@ -503,14 +610,18 @@ cargo build --release --no-default-features
 ### No Git
 ```bash
 cargo build --release --no-default-features --features colors
-# For systems without git
+# For systems without git requirements
+# Size: ~4-5 MB
 ```
 
 ### No Colors
 ```bash
 cargo build --release --no-default-features --features git
 # Lighter output, no colored terminal text
+# Size: ~4-5 MB
 ```
+
+---
 
 ## Examples
 
@@ -552,14 +663,33 @@ ruslink config --dir ~/.dotfiles --target ~ --git
 ruslink updated-package --restow --force --backup
 ```
 
+### Troubleshooting & Recovery
+
+```bash
+# Preview cleanup of broken links
+ruslink clean --dry-run -v --dir ~/.dotfiles --target ~
+
+# Actually clean (removes broken symlinks and empty dirs)
+ruslink clean --dir ~/.dotfiles --target ~
+
+# View what would happen (verbose mode)
+ruslink nvim --dry-run -v --force --dir ~/.dotfiles --target ~
+```
+
+---
+
 ## Notes & Best Practices
 
-- **Dry-run First** - Always use `--dry-run -v` before destructive operations
-- **Backup Important Files** - Use `--backup` when overwriting existing files
-- **Git Integration** - Enable `--git` to track all changes
-- **Merge Mode Clarity** - Use `--show-merge-history` to verify merges
-- **Test Permissions** - Ensure proper read/write access to target directories
-- **When Dry-Run is Enabled** - Git auto-commit is automatically disabled for safety
+- **Dry-run First** — Always use `--dry-run -v` before destructive operations
+- **Backup Important Files** — Use `--backup` when overwriting existing files
+- **Git Integration** — Enable `--git` to track all changes
+- **Merge Mode Clarity** — Use `--show-merge-history` to verify merges
+- **Test Permissions** — Ensure proper read/write access to target directories
+- **When Dry-Run is Enabled** — Git auto-commit is automatically disabled for safety
+- **Multiple Packages** — Use merge mode to combine shell configs from different packages
+- **Dotfiles Naming** — Start files with `dot-` to enable automatic `.` prefix transformation
+
+---
 
 ## Troubleshooting
 
@@ -567,28 +697,37 @@ ruslink updated-package --restow --force --backup
 ```
 Error: Package 'nvim' not found in ~/.dotfiles
 ```
-Verify the package directory exists: `ls -la ~/.dotfiles/nvim`
+**Solution:** Verify the package directory exists: `ls -la ~/.dotfiles/nvim`
 
 ### Existing File Conflicts
 ```
-Error: Conflict: ~/.bashrc already exists (use --force or --adopt)
+Error: Conflict: ~/.bashrc already exists (use --force, --adopt, or --merge)
 ```
-Choose a strategy:
-- `--adopt` - Replace with symlink
-- `--force --backup` - Overwrite and backup
-- `--merge` - Merge compatible files
+**Solution:** Choose a strategy:
+- `--adopt` — Replace with symlink
+- `--force --backup` — Overwrite and backup
+- `--merge` — Merge compatible files (shell configs)
 
 ### Git Not Found
 ```
 Error: Git is not installed or not found in PATH. Please install Git first.
 ```
-Install Git: `sudo apt install git` (Linux) or `brew install git` (macOS)
+**Solution:** Install Git: `sudo apt install git` (Linux) or `brew install git` (macOS)
 
 ### Permission Denied
 ```
 Error: Failed to create symlink: Permission denied
 ```
-Check directory permissions: `ls -la ~/.dotfiles`
+**Solution:** Check directory permissions: `ls -la ~/.dotfiles`
+
+### Broken Symlinks After Manual Deletions
+```bash
+# Use clean command to remove them
+ruslink clean --dir ~/.dotfiles --target ~ --dry-run -v
+ruslink clean --dir ~/.dotfiles --target ~
+```
+
+---
 
 ## Contributing
 
@@ -596,6 +735,9 @@ Contributions are welcome! Please ensure:
 - Code passes `just lint`
 - Tests pass with `just test`
 - Documentation is updated
+- All features are tested
+
+---
 
 ## License
 
