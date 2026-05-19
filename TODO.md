@@ -368,13 +368,13 @@ This document outlines planned features, improvements, and security enhancements
 
 ## 📅 Release Timeline (Estimated)
 
-- **v0.6.x** — Security Documentation (Phase 1) — Q2 2024
-- **v0.7.x** — Enhanced Validation (Phase 2.1) — Q3 2024
-- **v0.8.x** — Configuration File Support (Phase 3.1) — Q3 2024
-- **v0.9.x** — Hook System (Phase 4.1) — Q4 2024
-- **v1.0.0** — Stable Release with Core Features — Q4 2024
-- **v1.1.x** — Advanced Features (Phase 4.2-4.3) — Q1 2025
-- **v1.2.x** — Performance Optimization (Phase 5) — Q2 2025
+- **v0.6.x** — Security Documentation (Phase 1) — Q3 2025
+- **v0.7.x** — Enhanced Validation (Phase 2.1) — Q4 2025
+- **v0.8.x** — Configuration File Support (Phase 3.1) — Q2 2026
+- **v0.9.x** — Hook System (Phase 4.1) — Q4 2026
+- **v1.0.0** — Stable Release with Core Features — Q2 2027
+- **v1.1.x** — Advanced Features (Phase 4.2-4.3) — Q4 2027
+- **v1.2.x** — Performance Optimization (Phase 5) — Q2 2028
 
 ---
 
