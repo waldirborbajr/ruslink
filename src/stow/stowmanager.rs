@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::Result;
-use pathdiff::diff_paths;
+
 use tracing::{debug, info};
 
 use super::merge::{MergeAction, MergeHandler};
@@ -203,6 +203,11 @@ fn stow_item(
         }
     }
 
+    // === NEW: Validate before any conflict handling or symlink creation ===
+    if !config.dry_run {
+        validate_symlink_target(source, destination)?;
+    }
+
     if destination.exists() || destination.symlink_metadata().is_ok() {
         if let Some(merge) = merge_handler {
             match MergeHandler::resolve_conflict(destination, source, &config.merge_settings) {
@@ -258,7 +263,6 @@ fn stow_item(
             destination.display(),
             source.display()
         );
-
         return Ok(true);
     }
 
@@ -361,9 +365,56 @@ fn handle_existing_destination(destination: &Path, config: &Config) -> Result<()
     Ok(())
 }
 
+// Add near other helpers (after make_relative, before backup_existing)
+fn validate_symlink_target(source: &Path, destination: &Path) -> Result<()> {
+    if !source.exists() {
+        anyhow::bail!(
+            "Symlink target does not exist: {} (for destination {})",
+            source.display(),
+            destination.display()
+        );
+    }
+
+    // Additional safety checks
+    if source.is_symlink() {
+        // Optional: warn or resolve nested symlinks
+        debug!(
+            "Target is itself a symlink: {} -> {}",
+            source.display(),
+            fs::read_link(source)?.display()
+        );
+    }
+
+    // Ensure we can compute a valid relative path
+    if make_relative(source, destination).components().count() == 0 {
+        anyhow::bail!(
+            "Failed to compute relative path from {} to {}",
+            source.display(),
+            destination.display()
+        );
+    }
+
+    // Prevent symlinking to self (very unlikely but defensive)
+    if let Ok(canonical_src) = source.canonicalize() {
+        if let Ok(canonical_dst) = destination.canonicalize() {
+            if canonical_src == canonical_dst {
+                anyhow::bail!(
+                    "Cannot create symlink pointing to itself: {}",
+                    source.display()
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn make_relative(source: &Path, destination: &Path) -> PathBuf {
-    diff_paths(source, destination.parent().unwrap_or(destination))
-        .unwrap_or_else(|| source.to_path_buf())
+    let parent = destination.parent().unwrap_or(destination);
+    pathdiff::diff_paths(source, parent).unwrap_or_else(|| {
+        debug!("Failed to compute relative path, falling back to absolute");
+        source.to_path_buf()
+    })
 }
 
 fn backup_existing(path: &Path) -> Result<()> {
