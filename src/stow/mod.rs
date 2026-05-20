@@ -6,4 +6,4 @@ mod stowmanager;
 
 pub use commands::{clean_target, list_packages, show_status};
 pub use merge::MergeConfig;
-pub use stowmanager::{stow_package, unstow_package, StowStats};
+pub use stowmanager::{stow_package, unstow_package, OperationLogger, StowStats};

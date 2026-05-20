@@ -5,18 +5,94 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::Result;
-
+use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
 use super::merge::{MergeAction, MergeHandler};
 use crate::cli::Config;
 use crate::utils::should_ignore;
 
+// ====================== OPERATION LOGGER ======================
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileOperation {
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub user: String,
+    pub package: String,
+    pub operation: String,
+    pub source: Option<String>,
+    pub destination: String,
+    pub success: bool,
+    pub details: Option<String>,
+}
+
+pub struct OperationLogger {
+    package: String,
+}
+
+impl OperationLogger {
+    pub const fn new(package: String) -> Self {
+        Self { package }
+    }
+
+    fn get_current_user() -> String {
+        std::env::var("USER")
+            .or_else(|_| std::env::var("USERNAME"))
+            .unwrap_or_else(|_| "unknown".to_string())
+    }
+
+    pub fn log(
+        &self,
+        operation: &str,
+        destination: &Path,
+        source: Option<&Path>,
+        success: bool,
+        details: Option<String>,
+    ) {
+        let entry = FileOperation {
+            timestamp: chrono::Utc::now(),
+            user: Self::get_current_user(),
+            package: self.package.clone(),
+            operation: operation.to_string(),
+            source: source.map(|p| p.display().to_string()),
+            destination: destination.display().to_string(),
+            success,
+            details,
+        };
+
+        if success {
+            info!(
+                operation = %operation,
+                dest = %destination.display(),
+                src = ?source.map(|p| p.display()),
+                "File operation completed"
+            );
+        } else {
+            tracing::error!(
+                operation = %operation,
+                dest = %destination.display(),
+                "File operation failed"
+            );
+        }
+
+        debug!(entry = ?entry, "Operation logged as JSON");
+    }
+}
+
+// ====================== RECURSION CONTEXT ======================
+
+struct VisitContext<'a> {
+    root: &'a Path,
+    target_base: &'a Path,
+    config: &'a Config,
+    ignores: &'a [regex::Regex],
+    merge_handler: Option<&'a MergeHandler>,
+    logger: &'a OperationLogger,
+    stats: &'a mut StowStats,
+}
+
 // ====================== DOTFILES HANDLING ======================
 
-/// Transforma paths com prefixo 'dot-' em paths com prefixo '.'
-/// Exemplo: "dot-bashrc" → ".bashrc"
-///          "dot-config/fish" → ".config/fish"
 fn transform_dot_prefix(path: &Path) -> PathBuf {
     let mut components = Vec::new();
 
@@ -33,10 +109,8 @@ fn transform_dot_prefix(path: &Path) -> PathBuf {
             std::path::Component::ParentDir => {
                 components.push("..".to_string());
             }
-            // Ignore current dir and handle the rest by re-emitting
             std::path::Component::CurDir => {}
             _ => {
-                // RootDir, Prefix, etc.
                 components.push(comp.as_os_str().to_string_lossy().into_owned());
             }
         }
@@ -75,6 +149,7 @@ pub fn stow_package(
     }
 
     let start = Instant::now();
+    let logger = OperationLogger::new(config.package.clone());
 
     info!("Stowing from {} → {}", source.display(), target.display());
 
@@ -86,18 +161,19 @@ pub fn stow_package(
 
     let mut stats = StowStats::default();
 
-    visit_source(
-        source,
-        source,
-        target,
+    let ctx = VisitContext {
+        root: source,
+        target_base: target,
         config,
         ignores,
-        merge_handler.as_ref(),
-        &mut stats,
-    )?;
+        merge_handler: merge_handler.as_ref(),
+        logger: &logger,
+        stats: &mut stats,
+    };
+
+    visit_source(ctx)?;
 
     let elapsed = start.elapsed();
-
     stats.print_summary("Stow", elapsed);
 
     if config.show_merge_history {
@@ -120,15 +196,25 @@ pub fn unstow_package(
     }
 
     let start = Instant::now();
+    let logger = OperationLogger::new(config.package.clone());
 
     info!("Unstowing from {} → {}", source.display(), target.display());
 
     let mut stats = StowStats::default();
 
-    visit_unstow(source, source, target, config, ignores, &mut stats)?;
+    let ctx = VisitContext {
+        root: source,
+        target_base: target,
+        config,
+        ignores,
+        merge_handler: None,
+        logger: &logger,
+        stats: &mut stats,
+    };
+
+    visit_unstow(ctx)?;
 
     let elapsed = start.elapsed();
-
     stats.print_summary("Unstow", elapsed);
 
     Ok(stats)
@@ -136,55 +222,55 @@ pub fn unstow_package(
 
 // ====================== STOW ======================
 
-fn visit_source(
-    root: &Path,
-    current: &Path,
-    target_base: &Path,
-    config: &Config,
-    ignores: &[regex::Regex],
-    merge_handler: Option<&MergeHandler>,
-    stats: &mut StowStats,
-) -> Result<()> {
-    for entry in fs::read_dir(current)? {
+// Allow is needed because we pass by value to simplify recursion with mutable stats
+#[allow(clippy::needless_pass_by_value)]
+fn visit_source(ctx: VisitContext) -> Result<()> {
+    for entry in fs::read_dir(ctx.root)? {
         let entry = entry?;
         let path = entry.path();
 
-        let rel_path = path.strip_prefix(root).unwrap_or(&path);
+        let rel_path = path.strip_prefix(ctx.root).unwrap_or(&path);
 
-        if should_ignore(rel_path, ignores) {
-            stats.files_ignored += 1;
-
+        if should_ignore(rel_path, ctx.ignores) {
+            ctx.stats.files_ignored += 1;
             debug!("Ignored: {}", rel_path.display());
-
             continue;
         }
 
-        // Aplicar transformação dot- se dotfiles mode está habilitado
-        let destination_rel_path = if config.dotfiles {
+        let destination_rel_path = if ctx.config.dotfiles {
             transform_dot_prefix(rel_path)
         } else {
             rel_path.to_path_buf()
         };
 
-        let destination = target_base.join(&destination_rel_path);
+        let destination = ctx.target_base.join(&destination_rel_path);
 
         if entry.file_type()?.is_dir() {
-            if !config.dry_run {
+            if !ctx.config.dry_run {
                 fs::create_dir_all(&destination)?;
-                stats.dirs_created += 1;
+                ctx.logger
+                    .log("create_directory", &destination, None, true, None);
+                ctx.stats.dirs_created += 1;
             }
 
-            visit_source(
-                root,
-                &path,
-                target_base,
-                config,
-                ignores,
-                merge_handler,
-                stats,
-            )?;
-        } else if stow_item(&path, &destination, config, merge_handler)? {
-            stats.files_linked += 1;
+            let sub_ctx = VisitContext {
+                root: &path,
+                target_base: ctx.target_base,
+                config: ctx.config,
+                ignores: ctx.ignores,
+                merge_handler: ctx.merge_handler,
+                logger: ctx.logger,
+                stats: ctx.stats,
+            };
+            visit_source(sub_ctx)?;
+        } else if stow_item(
+            &path,
+            &destination,
+            ctx.config,
+            ctx.merge_handler,
+            ctx.logger,
+        )? {
+            ctx.stats.files_linked += 1;
         }
     }
 
@@ -196,6 +282,7 @@ fn stow_item(
     destination: &Path,
     config: &Config,
     merge_handler: Option<&MergeHandler>,
+    logger: &OperationLogger,
 ) -> Result<bool> {
     if let Some(parent) = destination.parent() {
         if !config.dry_run {
@@ -203,10 +290,8 @@ fn stow_item(
         }
     }
 
-    // === VALIDATION PHASE ===
     if !config.dry_run {
-        // Previous validation + NEW circular detection
-        validate_symlink_target(source, destination)?; // from previous task
+        validate_symlink_target(source, destination)?;
         detect_circular_symlink(source, destination)?;
     }
 
@@ -215,7 +300,7 @@ fn stow_item(
             match MergeHandler::resolve_conflict(destination, source, &config.merge_settings) {
                 MergeAction::CreateLink => {
                     if !config.dry_run {
-                        remove_existing(destination)?;
+                        remove_existing(destination, logger)?;
                     }
                 }
 
@@ -227,9 +312,14 @@ fn stow_item(
                             destination.display()
                         );
                     } else {
-                        merge.append_content(destination, source, &config.merge_settings)?;
+                        merge.append_content(
+                            destination,
+                            source,
+                            &config.merge_settings,
+                            logger,
+                        )?;
                     }
-
+                    logger.log("append_content", destination, Some(source), true, None);
                     return Ok(true);
                 }
 
@@ -238,24 +328,21 @@ fn stow_item(
                         "Both are directories, continuing recursion: {}",
                         destination.display()
                     );
-
                     return Ok(true);
                 }
 
                 MergeAction::Conflict => {
                     if !config.force && !config.adopt {
                         anyhow::bail!(
-                            "Conflict: {} already exists \
-(use --force, --adopt or --merge)",
+                            "Conflict: {} already exists (use --force, --adopt or --merge)",
                             destination.display()
                         );
                     }
-
-                    handle_existing_destination(destination, config)?;
+                    handle_existing_destination(destination, config, logger)?;
                 }
             }
         } else {
-            handle_existing_destination(destination, config)?;
+            handle_existing_destination(destination, config, logger)?;
         }
     }
 
@@ -269,9 +356,9 @@ fn stow_item(
     }
 
     let relative = make_relative(source, destination);
-
     create_symlink(&relative, destination)?;
 
+    logger.log("create_symlink", destination, Some(source), true, None);
     info!("Linked: {} → {}", destination.display(), relative.display());
 
     Ok(true)
@@ -279,52 +366,56 @@ fn stow_item(
 
 // ====================== UNSTOW ======================
 
-fn visit_unstow(
-    root: &Path,
-    current: &Path,
-    target_base: &Path,
-    config: &Config,
-    ignores: &[regex::Regex],
-    stats: &mut StowStats,
-) -> Result<()> {
-    for entry in fs::read_dir(current)? {
+#[allow(clippy::needless_pass_by_value)]
+fn visit_unstow(ctx: VisitContext) -> Result<()> {
+    for entry in fs::read_dir(ctx.root)? {
         let entry = entry?;
         let path = entry.path();
 
-        let rel_path = path.strip_prefix(root).unwrap_or(&path);
+        let rel_path = path.strip_prefix(ctx.root).unwrap_or(&path);
 
-        if should_ignore(rel_path, ignores) {
+        if should_ignore(rel_path, ctx.ignores) {
             continue;
         }
 
-        // Aplicar transformação dot- se dotfiles mode está habilitado
-        let destination_rel_path = if config.dotfiles {
+        let destination_rel_path = if ctx.config.dotfiles {
             transform_dot_prefix(rel_path)
         } else {
             rel_path.to_path_buf()
         };
 
-        let destination = target_base.join(&destination_rel_path);
+        let destination = ctx.target_base.join(&destination_rel_path);
 
         if entry.file_type()?.is_dir() {
-            visit_unstow(root, &path, target_base, config, ignores, stats)?;
+            let sub_ctx = VisitContext {
+                root: &path,
+                target_base: ctx.target_base,
+                config: ctx.config,
+                ignores: ctx.ignores,
+                merge_handler: ctx.merge_handler,
+                logger: ctx.logger,
+                stats: ctx.stats,
+            };
+            visit_unstow(sub_ctx)?;
 
-            if !config.dry_run && destination.exists() {
+            if !ctx.config.dry_run && destination.exists() {
                 let _ = fs::remove_dir(&destination);
+                ctx.logger
+                    .log("remove_directory", &destination, None, true, None);
             }
         } else if is_managed_symlink(&destination, &path) {
-            if config.backup {
-                backup_existing(&destination)?;
+            if ctx.config.backup {
+                backup_existing(&destination, ctx.logger)?;
             }
 
-            if config.dry_run {
+            if ctx.config.dry_run {
                 info!("DRY RUN: would remove {}", destination.display());
             } else {
                 fs::remove_file(&destination)?;
-
+                ctx.logger
+                    .log("remove_symlink", &destination, Some(&path), true, None);
                 info!("Removed: {}", destination.display());
-
-                stats.files_removed += 1;
+                ctx.stats.files_removed += 1;
             }
         }
     }
@@ -334,32 +425,33 @@ fn visit_unstow(
 
 // ====================== HELPERS ======================
 
-fn handle_existing_destination(destination: &Path, config: &Config) -> Result<()> {
+fn handle_existing_destination(
+    destination: &Path,
+    config: &Config,
+    logger: &OperationLogger,
+) -> Result<()> {
     if destination
         .symlink_metadata()
         .is_ok_and(|m| m.file_type().is_symlink())
     {
         if !config.dry_run {
             fs::remove_file(destination)?;
+            logger.log("remove_existing_symlink", destination, None, true, None);
         }
-
         return Ok(());
     }
 
     if config.adopt {
         debug!("Adopting existing file: {}", destination.display());
-
-        remove_existing(destination)?;
+        remove_existing(destination, logger)?;
     } else if config.force {
         if config.backup {
-            backup_existing(destination)?;
+            backup_existing(destination, logger)?;
         }
-
-        remove_existing(destination)?;
+        remove_existing(destination, logger)?;
     } else {
         anyhow::bail!(
-            "Conflict: {} already exists \
-(use --force or --adopt)",
+            "Conflict: {} already exists (use --force or --adopt)",
             destination.display()
         );
     }
@@ -367,7 +459,6 @@ fn handle_existing_destination(destination: &Path, config: &Config) -> Result<()
     Ok(())
 }
 
-// Add near other helpers (after make_relative, before backup_existing)
 fn validate_symlink_target(source: &Path, destination: &Path) -> Result<()> {
     if !source.exists() {
         anyhow::bail!(
@@ -377,9 +468,7 @@ fn validate_symlink_target(source: &Path, destination: &Path) -> Result<()> {
         );
     }
 
-    // Additional safety checks
     if source.is_symlink() {
-        // Optional: warn or resolve nested symlinks
         debug!(
             "Target is itself a symlink: {} -> {}",
             source.display(),
@@ -387,7 +476,6 @@ fn validate_symlink_target(source: &Path, destination: &Path) -> Result<()> {
         );
     }
 
-    // Ensure we can compute a valid relative path
     if make_relative(source, destination).components().count() == 0 {
         anyhow::bail!(
             "Failed to compute relative path from {} to {}",
@@ -396,7 +484,6 @@ fn validate_symlink_target(source: &Path, destination: &Path) -> Result<()> {
         );
     }
 
-    // Prevent symlinking to self (very unlikely but defensive)
     if let Ok(canonical_src) = source.canonicalize() {
         if let Ok(canonical_dst) = destination.canonicalize() {
             if canonical_src == canonical_dst {
@@ -419,7 +506,7 @@ fn make_relative(source: &Path, destination: &Path) -> PathBuf {
     })
 }
 
-fn backup_existing(path: &Path) -> Result<()> {
+fn backup_existing(path: &Path, logger: &OperationLogger) -> Result<()> {
     let mut backup = path.with_extension("bak");
     let mut counter = 1;
 
@@ -429,19 +516,21 @@ fn backup_existing(path: &Path) -> Result<()> {
     }
 
     fs::rename(path, &backup)?;
-
+    logger.log("create_backup", &backup, Some(path), true, None);
     info!("Backed up: {} → {}", path.display(), backup.display());
 
     Ok(())
 }
 
-fn remove_existing(path: &Path) -> Result<()> {
+fn remove_existing(path: &Path, logger: &OperationLogger) -> Result<()> {
     let meta = path.symlink_metadata()?;
 
     if meta.is_dir() && !meta.file_type().is_symlink() {
         fs::remove_dir_all(path)?;
+        logger.log("remove_directory_recursive", path, None, true, None);
     } else {
         fs::remove_file(path)?;
+        logger.log("remove_file", path, None, true, None);
     }
 
     Ok(())
@@ -462,7 +551,6 @@ fn is_managed_symlink(destination: &Path, source: &Path) -> bool {
             return a == b;
         }
     }
-
     false
 }
 
@@ -495,20 +583,17 @@ fn create_symlink(source: &Path, destination: &Path) -> Result<()> {
     })
 }
 
-/// Detects circular symlinks that would be created or already exist
 fn detect_circular_symlink(source: &Path, destination: &Path) -> Result<()> {
-    // Quick check: if destination doesn't exist yet, no circularity possible
     if !destination.exists() && destination.symlink_metadata().is_err() {
         return Ok(());
     }
 
-    // Try to resolve both paths canonically
     let Ok(canonical_source) = source.canonicalize() else {
-        return Ok(()); // Can't canonicalize → skip (e.g. missing target)
+        return Ok(());
     };
 
     let Ok(canonical_dest) = destination.canonicalize() else {
-        return Ok(()); // Destination doesn't exist or inaccessible
+        return Ok(());
     };
 
     if canonical_source == canonical_dest {
@@ -518,7 +603,6 @@ fn detect_circular_symlink(source: &Path, destination: &Path) -> Result<()> {
         );
     }
 
-    // Additional protection: prevent symlink that would create a loop with existing structure
     if let Ok(link_target) = fs::read_link(destination) {
         let abs_link = if link_target.is_absolute() {
             link_target

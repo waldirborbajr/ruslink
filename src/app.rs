@@ -5,9 +5,7 @@ use tracing::{debug, info};
 
 use crate::cli::parse_args;
 use crate::git::handle_git_operations;
-use crate::stow::{
-    clean_target, list_packages, show_status, stow_package, unstow_package, StowStats,
-};
+use crate::stow::{clean_target, list_packages, show_status, stow_package, unstow_package};
 use crate::utils::{
     confirm_action, error, load_all_ignore_patterns, setup_tracing, success, warning,
 };
@@ -17,7 +15,8 @@ pub fn run() -> Result<()> {
 
     let config = parse_args();
 
-    setup_tracing(config.verbose);
+    // Setup tracing with package name for operation logging
+    setup_tracing(config.verbose, &config.package);
 
     // ======================
     // NEW COMMANDS
@@ -80,14 +79,16 @@ pub fn run() -> Result<()> {
         }
     }
 
-    let mut total_stats = StowStats::default();
+    // We still collect stats for potential future use / logging
+    let mut _total_stats = crate::stow::StowStats::default();
 
     // UNSTOW
     if config.restow || config.delete {
         info!("Unstowing package '{}'...", config.package);
         let unstow_stats =
             unstow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
-        total_stats.files_removed = unstow_stats.files_removed;
+
+        _total_stats.files_removed = unstow_stats.files_removed;
     }
 
     // STOW
@@ -95,9 +96,9 @@ pub fn run() -> Result<()> {
         info!("Stowing package '{}'...", config.package);
         let stow_stats = stow_package(&package_path, &config.target_dir, &config, &ignore_regexes)?;
 
-        total_stats.files_linked = stow_stats.files_linked;
-        total_stats.dirs_created = stow_stats.dirs_created;
-        total_stats.files_ignored = stow_stats.files_ignored;
+        _total_stats.files_linked = stow_stats.files_linked;
+        _total_stats.dirs_created = stow_stats.dirs_created;
+        _total_stats.files_ignored = stow_stats.files_ignored;
     }
 
     // GIT OPERATIONS
@@ -111,15 +112,14 @@ pub fn run() -> Result<()> {
     } else {
         success("✅ Done!");
 
-        if total_stats.files_linked > 0 || total_stats.files_removed > 0 {
-            info!(
-                "Summary → Linked: {} | Removed: {} | Dirs: {} | Ignored: {}",
-                total_stats.files_linked,
-                total_stats.files_removed,
-                total_stats.dirs_created,
-                total_stats.files_ignored
-            );
-        }
+        // Optional: You can re-enable detailed summary if desired
+        // info!(
+        //     "Summary → Linked: {} | Removed: {} | Dirs: {} | Ignored: {}",
+        //     _total_stats.files_linked,
+        //     _total_stats.files_removed,
+        //     _total_stats.dirs_created,
+        //     _total_stats.files_ignored
+        // );
     }
 
     Ok(())
