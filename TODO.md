@@ -17,7 +17,7 @@ This document outlines planned features, improvements, and security enhancements
 **Items:**
 - [ ] **Symlink Validation**
   - [x] Validate symlink targets before creation
-  - [ ] Detect circular symlinks
+  - [x] Detect circular symlinks
   - [ ] Prevent symlinks pointing outside target directory (if desired)
   - [ ] Document symlink safety checks
   - [ ] Add `--validate` flag to verify existing symlinks

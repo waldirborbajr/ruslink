@@ -203,9 +203,11 @@ fn stow_item(
         }
     }
 
-    // === NEW: Validate before any conflict handling or symlink creation ===
+    // === VALIDATION PHASE ===
     if !config.dry_run {
-        validate_symlink_target(source, destination)?;
+        // Previous validation + NEW circular detection
+        validate_symlink_target(source, destination)?; // from previous task
+        detect_circular_symlink(source, destination)?;
     }
 
     if destination.exists() || destination.symlink_metadata().is_ok() {
@@ -491,4 +493,52 @@ fn create_symlink(source: &Path, destination: &Path) -> Result<()> {
             e
         )
     })
+}
+
+/// Detects circular symlinks that would be created or already exist
+fn detect_circular_symlink(source: &Path, destination: &Path) -> Result<()> {
+    // Quick check: if destination doesn't exist yet, no circularity possible
+    if !destination.exists() && destination.symlink_metadata().is_err() {
+        return Ok(());
+    }
+
+    // Try to resolve both paths canonically
+    let Ok(canonical_source) = source.canonicalize() else {
+        return Ok(()); // Can't canonicalize → skip (e.g. missing target)
+    };
+
+    let Ok(canonical_dest) = destination.canonicalize() else {
+        return Ok(()); // Destination doesn't exist or inaccessible
+    };
+
+    if canonical_source == canonical_dest {
+        anyhow::bail!(
+            "Circular symlink detected: {} would point to itself (or existing loop)",
+            destination.display()
+        );
+    }
+
+    // Additional protection: prevent symlink that would create a loop with existing structure
+    if let Ok(link_target) = fs::read_link(destination) {
+        let abs_link = if link_target.is_absolute() {
+            link_target
+        } else {
+            destination
+                .parent()
+                .unwrap_or(destination)
+                .join(link_target)
+        };
+
+        if let Ok(canonical_link) = abs_link.canonicalize() {
+            if canonical_link == canonical_source {
+                anyhow::bail!(
+                    "Would create circular symlink: {} → {} (already loops back)",
+                    destination.display(),
+                    source.display()
+                );
+            }
+        }
+    }
+
+    Ok(())
 }
