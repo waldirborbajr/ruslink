@@ -5,6 +5,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tracing::{debug, info, warn};
 
+use crate::stow::OperationLogger; // Updated import
+
 /// Ações possíveis quando há conflito entre packages
 #[derive(Debug, Clone, Copy)]
 pub enum MergeAction {
@@ -160,64 +162,53 @@ impl MergeHandler {
         false
     }
 
-    /// Fazer append de conteúdo com marcadores
     pub fn append_content(
         &self,
         destination: &Path,
         source: &Path,
         config: &MergeConfig,
+        logger: &OperationLogger, // Keep this
     ) -> Result<()> {
         let source_content = fs::read_to_string(source)
             .map_err(|e| anyhow!("Failed to read source file {}: {e}", source.display()))?;
 
         let mut dest_content = fs::read_to_string(destination).unwrap_or_default();
 
-        // Marcadores para tracking
         let start_marker = format!("# === ruslink [{}] ===", self.package_name);
-
         let end_marker = format!("# === ruslink [{}] (end) ===", self.package_name);
 
-        // Evitar duplicatas
         if dest_content.contains(&start_marker) {
-            debug!(
-                "Content from {} already merged in {}, skipping",
-                self.package_name,
-                destination.display()
-            );
-
+            debug!("Content already merged, skipping");
             return Ok(());
         }
 
-        // Append com marcadores
         if !dest_content.ends_with('\n') && !dest_content.is_empty() {
             dest_content.push('\n');
         }
-
         dest_content.push('\n');
-
         dest_content.push_str(&start_marker);
-
         dest_content.push('\n');
-
         dest_content.push_str(&source_content);
-
         if !source_content.ends_with('\n') {
             dest_content.push('\n');
         }
-
         dest_content.push_str(&end_marker);
-
         dest_content.push('\n');
 
-        // Escrever arquivo merged
         fs::write(destination, &dest_content)
             .map_err(|e| anyhow!("Failed to write merged file {}: {e}", destination.display()))?;
 
-        // Registrar merge
         if config.track_merges {
             self.log_merge(destination)?;
         }
 
+        logger.log(
+            "append_content",
+            destination,
+            Some(source),
+            true,
+            Some("merged with markers".into()),
+        );
         info!(
             "✓ Merged content from {} into {}",
             self.package_name,

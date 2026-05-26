@@ -16,8 +16,8 @@ This document outlines planned features, improvements, and security enhancements
 
 **Items:**
 - [ ] **Symlink Validation**
-  - [ ] Validate symlink targets before creation
-  - [ ] Detect circular symlinks
+  - [x] Validate symlink targets before creation
+  - [x] Detect circular symlinks
   - [ ] Prevent symlinks pointing outside target directory (if desired)
   - [ ] Document symlink safety checks
   - [ ] Add `--validate` flag to verify existing symlinks
@@ -121,10 +121,10 @@ This document outlines planned features, improvements, and security enhancements
 
 **Items:**
 - [ ] **Structured Logging**
-  - [ ] Log all file operations (create, modify, delete)
-  - [ ] Include timestamps, user, package, operation
+  - [x] Log all file operations (create, modify, delete)
+  - [x] Include timestamps, user, package, operation
   - [ ] Configurable log levels and output formats
-  - [ ] JSON export for analysis
+  - [x] JSON export for analysis
 
 - [ ] **Audit Log File**
   - [ ] Create `.ruslink-audit.log` (optional, flag-controlled)
