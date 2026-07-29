@@ -1,7 +1,7 @@
 // src/stow/stowmanager.rs
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::Result;
@@ -91,32 +91,188 @@ struct VisitContext<'a> {
     stats: &'a mut StowStats,
 }
 
+// ====================== PATH CONTAINMENT (SECURITY) ======================
+
+/// Returns true if `path` contains components that can escape a base directory
+/// (`..`, root, or Windows prefix). Package-relative paths must never include these.
+fn path_has_escape(path: &Path) -> bool {
+    path.components().any(|c| {
+        matches!(
+            c,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
+    })
+}
+
+/// Lexically normalize a path (resolve `.` and `..` without touching the filesystem).
+/// Used so containment checks work even when the destination does not exist yet.
+fn normalize_path(path: &Path) -> PathBuf {
+    let mut result = PathBuf::new();
+
+    for component in path.components() {
+        match component {
+            Component::Prefix(prefix) => result.push(prefix.as_os_str()),
+            Component::RootDir => result.push(component.as_os_str()),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                // Do not pop past the root / prefix
+                if result.as_os_str().is_empty() {
+                    // Relative path that starts with .. — keep marker for starts_with failure
+                    result.push("..");
+                } else {
+                    let last = result.components().next_back();
+                    match last {
+                        Some(Component::Normal(_)) => {
+                            result.pop();
+                        }
+                        _ => {
+                            result.push("..");
+                        }
+                    }
+                }
+            }
+            Component::Normal(name) => result.push(name),
+        }
+    }
+
+    result
+}
+
+/// Resolve `path` to an absolute path without requiring the final component to exist.
+fn absolute_path(path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join(path)
+    }
+}
+
+/// Ensure `destination` stays strictly under `target_base` (no path escape).
+///
+/// Checks:
+/// 1. Lexical components of `destination` must not introduce escapes relative to target
+/// 2. After normalization, the destination path must start with the normalized target
+///
+/// Call this before any create / remove / merge on a destination path.
+fn ensure_under_target(destination: &Path, target_base: &Path) -> Result<()> {
+    if path_has_escape(destination) && !destination.is_absolute() {
+        // Relative destination still carrying `..` is always unsafe
+        anyhow::bail!(
+            "Refusing path with escape components (`..` or absolute): {} \
+             (must stay under target {})",
+            destination.display(),
+            target_base.display()
+        );
+    }
+
+    let target_abs = absolute_path(target_base);
+    let dest_abs = absolute_path(destination);
+
+    let target_norm = normalize_path(&target_abs);
+    let dest_norm = normalize_path(&dest_abs);
+
+    // Destination must equal target or be a strict child of target
+    if dest_norm != target_norm && !dest_norm.starts_with(&target_norm) {
+        anyhow::bail!(
+            "Refusing path outside target directory: {} (resolved: {}) — \
+             target is {} (resolved: {})",
+            destination.display(),
+            dest_norm.display(),
+            target_base.display(),
+            target_norm.display()
+        );
+    }
+
+    // Extra guard: if dest_norm somehow still contains ParentDir, reject.
+    if path_has_escape(&dest_norm) {
+        anyhow::bail!(
+            "Refusing unresolved escape in destination path: {}",
+            dest_norm.display()
+        );
+    }
+
+    Ok(())
+}
+
+/// Reject package-relative paths that contain `..`, root, or prefix components.
+fn reject_package_escape(rel_path: &Path) -> Result<()> {
+    if path_has_escape(rel_path) {
+        anyhow::bail!(
+            "Refusing package path with escape components (`..` or absolute): {}. \
+             Package entries must stay within the package directory.",
+            rel_path.display()
+        );
+    }
+    Ok(())
+}
+
 // ====================== DOTFILES HANDLING ======================
 
-fn transform_dot_prefix(path: &Path) -> PathBuf {
+/// Transform `dot-` prefixes to leading dots (e.g. `dot-bashrc` → `.bashrc`).
+///
+/// Security: rejects any resulting path that contains `..`, root, or prefix
+/// components. A crafted name such as `dot-..` would otherwise become `..`
+/// and escape the target directory.
+fn transform_dot_prefix(path: &Path) -> Result<PathBuf> {
     let mut components = Vec::new();
 
     for comp in path.components() {
         match comp {
-            std::path::Component::Normal(os_str) => {
+            Component::Normal(os_str) => {
                 let name = os_str.to_string_lossy();
                 if let Some(stripped) = name.strip_prefix("dot-") {
+                    // Reject empty strip or escape-like results
+                    if stripped.is_empty() || stripped == ".." || stripped == "." {
+                        anyhow::bail!(
+                            "Refusing unsafe dotfiles transform of component '{}': \
+                             would produce an escape or empty name",
+                            name
+                        );
+                    }
+                    // If stripped still looks like a path escape when parsed
+                    let candidate = Path::new(stripped);
+                    if path_has_escape(candidate) {
+                        anyhow::bail!(
+                            "Refusing unsafe dotfiles transform of component '{}': \
+                             result contains escape components",
+                            name
+                        );
+                    }
                     components.push(format!(".{stripped}"));
                 } else {
+                    if name == ".." || name == "." {
+                        anyhow::bail!(
+                            "Refusing package component '{}': escape or current-dir name",
+                            name
+                        );
+                    }
                     components.push(name.into_owned());
                 }
             }
-            std::path::Component::ParentDir => {
-                components.push("..".to_string());
+            Component::ParentDir => {
+                anyhow::bail!(
+                    "Refusing path with parent-directory component (`..`): {}",
+                    path.display()
+                );
             }
-            std::path::Component::CurDir => {}
-            _ => {
-                components.push(comp.as_os_str().to_string_lossy().into_owned());
+            Component::CurDir => {}
+            Component::RootDir | Component::Prefix(_) => {
+                anyhow::bail!(
+                    "Refusing absolute or prefixed path component in package entry: {}",
+                    path.display()
+                );
             }
         }
     }
 
-    components.iter().collect()
+    let result: PathBuf = components.iter().collect();
+
+    // Final safety check on the assembled path
+    reject_package_escape(&result)?;
+
+    Ok(result)
 }
 
 #[derive(Debug, Default)]
@@ -237,13 +393,22 @@ fn visit_source(ctx: VisitContext) -> Result<()> {
             continue;
         }
 
+        // Reject escape components in the package-relative path before any transform
+        reject_package_escape(rel_path)?;
+
         let destination_rel_path = if ctx.config.dotfiles {
-            transform_dot_prefix(rel_path)
+            transform_dot_prefix(rel_path)?
         } else {
             rel_path.to_path_buf()
         };
 
+        // Reject escape after transform as well
+        reject_package_escape(&destination_rel_path)?;
+
         let destination = ctx.target_base.join(&destination_rel_path);
+
+        // Containment: destination must stay under target_base
+        ensure_under_target(&destination, ctx.target_base)?;
 
         if entry.file_type()?.is_dir() {
             if !ctx.config.dry_run {
@@ -266,6 +431,7 @@ fn visit_source(ctx: VisitContext) -> Result<()> {
         } else if stow_item(
             &path,
             &destination,
+            ctx.target_base,
             ctx.config,
             ctx.merge_handler,
             ctx.logger,
@@ -280,11 +446,16 @@ fn visit_source(ctx: VisitContext) -> Result<()> {
 fn stow_item(
     source: &Path,
     destination: &Path,
+    target_base: &Path,
     config: &Config,
     merge_handler: Option<&MergeHandler>,
     logger: &OperationLogger,
 ) -> Result<bool> {
+    // Containment check before any mutation
+    ensure_under_target(destination, target_base)?;
+
     if let Some(parent) = destination.parent() {
+        ensure_under_target(parent, target_base)?;
         if !config.dry_run {
             fs::create_dir_all(parent)?;
         }
@@ -300,11 +471,14 @@ fn stow_item(
             match MergeHandler::resolve_conflict(destination, source, &config.merge_settings) {
                 MergeAction::CreateLink => {
                     if !config.dry_run {
-                        remove_existing(destination, logger)?;
+                        remove_existing(destination, target_base, logger)?;
                     }
                 }
 
                 MergeAction::AppendContent => {
+                    // Re-check containment before writing merged content
+                    ensure_under_target(destination, target_base)?;
+
                     if config.dry_run {
                         info!(
                             "DRY RUN: would append content from {} to {}",
@@ -338,11 +512,11 @@ fn stow_item(
                             destination.display()
                         );
                     }
-                    handle_existing_destination(destination, config, logger)?;
+                    handle_existing_destination(destination, target_base, config, logger)?;
                 }
             }
         } else {
-            handle_existing_destination(destination, config, logger)?;
+            handle_existing_destination(destination, target_base, config, logger)?;
         }
     }
 
@@ -378,13 +552,19 @@ fn visit_unstow(ctx: VisitContext) -> Result<()> {
             continue;
         }
 
+        reject_package_escape(rel_path)?;
+
         let destination_rel_path = if ctx.config.dotfiles {
-            transform_dot_prefix(rel_path)
+            transform_dot_prefix(rel_path)?
         } else {
             rel_path.to_path_buf()
         };
 
+        reject_package_escape(&destination_rel_path)?;
+
         let destination = ctx.target_base.join(&destination_rel_path);
+
+        ensure_under_target(&destination, ctx.target_base)?;
 
         if entry.file_type()?.is_dir() {
             let sub_ctx = VisitContext {
@@ -399,6 +579,8 @@ fn visit_unstow(ctx: VisitContext) -> Result<()> {
             visit_unstow(sub_ctx)?;
 
             if !ctx.config.dry_run && destination.exists() {
+                // Only remove empty dirs that are still under target
+                ensure_under_target(&destination, ctx.target_base)?;
                 let _ = fs::remove_dir(&destination);
                 ctx.logger
                     .log("remove_directory", &destination, None, true, None);
@@ -411,6 +593,7 @@ fn visit_unstow(ctx: VisitContext) -> Result<()> {
             if ctx.config.dry_run {
                 info!("DRY RUN: would remove {}", destination.display());
             } else {
+                ensure_under_target(&destination, ctx.target_base)?;
                 fs::remove_file(&destination)?;
                 ctx.logger
                     .log("remove_symlink", &destination, Some(&path), true, None);
@@ -427,9 +610,12 @@ fn visit_unstow(ctx: VisitContext) -> Result<()> {
 
 fn handle_existing_destination(
     destination: &Path,
+    target_base: &Path,
     config: &Config,
     logger: &OperationLogger,
 ) -> Result<()> {
+    ensure_under_target(destination, target_base)?;
+
     if destination
         .symlink_metadata()
         .is_ok_and(|m| m.file_type().is_symlink())
@@ -443,12 +629,12 @@ fn handle_existing_destination(
 
     if config.adopt {
         debug!("Adopting existing file: {}", destination.display());
-        remove_existing(destination, logger)?;
+        remove_existing(destination, target_base, logger)?;
     } else if config.force {
         if config.backup {
             backup_existing(destination, logger)?;
         }
-        remove_existing(destination, logger)?;
+        remove_existing(destination, target_base, logger)?;
     } else {
         anyhow::bail!(
             "Conflict: {} already exists (use --force or --adopt)",
@@ -522,7 +708,10 @@ fn backup_existing(path: &Path, logger: &OperationLogger) -> Result<()> {
     Ok(())
 }
 
-fn remove_existing(path: &Path, logger: &OperationLogger) -> Result<()> {
+fn remove_existing(path: &Path, target_base: &Path, logger: &OperationLogger) -> Result<()> {
+    // Final containment check before destructive removal
+    ensure_under_target(path, target_base)?;
+
     let meta = path.symlink_metadata()?;
 
     if meta.is_dir() && !meta.file_type().is_symlink() {
@@ -625,4 +814,49 @@ fn detect_circular_symlink(source: &Path, destination: &Path) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod path_containment_tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn rejects_parent_dir_component() {
+        assert!(path_has_escape(Path::new("foo/../bar")));
+        assert!(path_has_escape(Path::new("..")));
+        assert!(path_has_escape(Path::new("../etc/passwd")));
+        assert!(!path_has_escape(Path::new("foo/bar")));
+        assert!(!path_has_escape(Path::new(".bashrc")));
+    }
+
+    #[test]
+    fn transform_rejects_dot_dot() {
+        assert!(transform_dot_prefix(Path::new("dot-..")).is_err());
+        assert!(transform_dot_prefix(Path::new("dot-.")).is_err());
+        assert!(transform_dot_prefix(Path::new("foo/..")).is_err());
+    }
+
+    #[test]
+    fn transform_accepts_safe_dotfiles() {
+        let result = transform_dot_prefix(Path::new("dot-bashrc")).unwrap();
+        assert_eq!(result, PathBuf::from(".bashrc"));
+
+        let result = transform_dot_prefix(Path::new("dot-config/nvim")).unwrap();
+        assert_eq!(result, PathBuf::from(".config/nvim"));
+    }
+
+    #[test]
+    fn ensure_under_target_rejects_escape() {
+        let target = Path::new("/home/user/dotfiles-target");
+        let dest = Path::new("/home/user/dotfiles-target/../../etc/passwd");
+        let result = ensure_under_target(dest, target);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn normalize_resolves_parent() {
+        let p = normalize_path(Path::new("/home/user/foo/../bar"));
+        assert_eq!(p, PathBuf::from("/home/user/bar"));
+    }
 }
