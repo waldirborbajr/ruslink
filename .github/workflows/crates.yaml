@@ -1,42 +1,29 @@
-name: Publish to crates.io
+name: Release to crates.io
 
 on:
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
-
-permissions:
-  contents: read
+  push:
+    tags:
+    - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   publish:
-    name: Publish to crates.io
     runs-on: ubuntu-latest
-    environment: crates-io
-    if: github.event.workflow_run.conclusion == 'success'
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      # FIX: rustfmt e clippy removidos — o CI já valida isso antes da release
-      # Evita retrabalho desnecessário no pipeline de publicação
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      # FIX: testes removidos — já cobertos pelo CI antes da release chegar aqui
-      # Manter apenas o que é específico do processo de publicação
-
-      - name: Dry-run publish
-        run: cargo publish --dry-run
-
-      # FIX: 'cargo login' expõe o token no log do runner
-      # '--token' passa direto para o publish sem logar
-      - name: Publish to crates.io
-        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 1
+    - name: Install correct toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    - name: Run cargo check
+      uses: actions-rs/cargo@v1
+      with:
+        command: check
+    - name: Login crates.io
+      run: cargo login ${CRATES_IO_TOKEN}
+      env:
+        CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+    - run: cargo publish
