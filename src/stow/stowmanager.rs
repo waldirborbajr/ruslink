@@ -226,26 +226,23 @@ fn transform_dot_prefix(path: &Path) -> Result<PathBuf> {
                     // Reject empty strip or escape-like results
                     if stripped.is_empty() || stripped == ".." || stripped == "." {
                         anyhow::bail!(
-                            "Refusing unsafe dotfiles transform of component '{}': \
-                             would produce an escape or empty name",
-                            name
+                            "Refusing unsafe dotfiles transform of component '{name}': \
+                             would produce an escape or empty name"
                         );
                     }
                     // If stripped still looks like a path escape when parsed
                     let candidate = Path::new(stripped);
                     if path_has_escape(candidate) {
                         anyhow::bail!(
-                            "Refusing unsafe dotfiles transform of component '{}': \
-                             result contains escape components",
-                            name
+                            "Refusing unsafe dotfiles transform of component '{name}': \
+                             result contains escape components"
                         );
                     }
                     components.push(format!(".{stripped}"));
                 } else {
                     if name == ".." || name == "." {
                         anyhow::bail!(
-                            "Refusing package component '{}': escape or current-dir name",
-                            name
+                            "Refusing package component '{name}': escape or current-dir name"
                         );
                     }
                     components.push(name.into_owned());
