@@ -1,135 +1,108 @@
 name: Release
-
 on:
   push:
     tags:
-      - 'v*'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Tag to release (e.g., v4.0.0)'
-        required: true
-
-permissions:
-  contents: write
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  release:
+    types: [created]
 
 env:
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
+  RUST_BACKTRACE: full
+
+permissions:
+  packages: write
+  contents: write
 
 jobs:
   release:
-    name: Create GitHub Release
+    name: Create release
+    permissions: write-all
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.get_version.outputs.version }}
-
+      release_upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_version: ${{ steps.get_version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v6
 
-      - name: Get version from tag
+      - name: Get release version
         id: get_version
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "📦 Version: ${VERSION}"
+        uses: battila7/get-version-action@v2
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v3
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          name: ruslink ${{ steps.get_version.outputs.version }}
-          draft: false
+          tag_name: ${{ steps.get_version.outputs.version }}
+          release_name: Release ${{ steps.get_version.outputs.version }}
+          draft: true
           prerelease: false
-          make_latest: true                    # ← Marca como Latest
-          generate_release_notes: true
-          body: |
-            **ruslink** ${{ steps.get_version.outputs.version }}
-            
-            A fast, modern Rust implementation of GNU Stow with built-in Git support.
 
-  build:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
+  build-unix:
+    name: Build ${{ matrix.job.os }} (${{ matrix.job.target }})
+    permissions: write-all
+    runs-on: ${{ matrix.job.os }}
     needs: release
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            use-cross: true
-          - os: macos-latest
-            target: x86_64-apple-darwin
-          - os: macos-latest
-            target: aarch64-apple-darwin
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-
+        job:
+          - {
+              os: ubuntu-latest,
+              target: i686-unknown-linux-gnu,
+              use-cross: true,
+            }
+          - {
+              os: ubuntu-latest,
+              target: i686-unknown-linux-musl,
+              use-cross: true,
+            }
+          - {
+              os: ubuntu-latest,
+              target: x86_64-unknown-linux-musl,
+              use-cross: true,
+            }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { os: macos-latest, target: x86_64-apple-darwin }
+          - { os: macos-latest, target: aarch64-apple-darwin }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - name: Install Rust toolchain
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ matrix.job.target }}
 
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.target }}
-
-      - name: Install cross (for aarch64)
-        if: matrix.use-cross
+      - name: Install cross
+        if: matrix.job.use-cross
         uses: taiki-e/install-action@v2
         with:
           tool: cross
 
-      - name: Install musl tools
-        if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
-
       - name: Build
-        run: |
-          if [ "${{ matrix.use-cross }}" = "true" ]; then
-            cross build --release --locked --target ${{ matrix.target }}
-          else
-            cargo build --release --locked --target ${{ matrix.target }}
-          fi
-
-      - name: Strip binary (Linux)
-        if: matrix.os == 'ubuntu-latest' && !matrix.use-cross
-        run: strip "target/${{ matrix.target }}/release/ruslink"
-
-      - name: Archive + Generate SHA256
         shell: bash
         run: |
-          cd "target/${{ matrix.target }}/release"
-          ARTIFACT="ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}"
-          
-          if [[ "${{ matrix.target }}" == *windows* ]]; then
-            7z a -y "../../${ARTIFACT}.zip" ruslink.exe
-            cd ../../
-            sha256sum "${ARTIFACT}.zip" > "${ARTIFACT}.zip.sha256"
+          if [[ "${{ matrix.job.use-cross }}" == "true" ]]; then
+            cross build --release --locked --target ${{ matrix.job.target }}
           else
-            tar czf "../../${ARTIFACT}.tar.gz" ruslink
-            cd ../../
-            sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
+            cargo build --release --locked --target ${{ matrix.job.target }}
           fi
+          
+      - name: Strip debug information
+        run: strip target/${{ matrix.job.target }}/release/gitpushup
 
-      - name: Upload Release Assets
-        uses: softprops/action-gh-release@v3
+      - name: Archive
+        run: tar czf gitpushup-${{ needs.release.outputs.release_version }}-${{ matrix.job.target }}.tar.gz -C target/${{ matrix.job.target }}/release gitpushup
+
+      - name: Upload release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          files: |
-            ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}.tar.gz
-            ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}.tar.gz.sha256
-            ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}.zip
-            ruslink-${{ needs.release.outputs.version }}-${{ matrix.target }}.zip.sha256
-          make_latest: true                    # ← Reforço de consistência
+          upload_url: ${{ needs.release.outputs.release_upload_url }}
+          asset_path: gitpushup-${{ needs.release.outputs.release_version }}-${{ matrix.job.target }}.tar.gz
+          asset_name: gitpushup-${{ needs.release.outputs.release_version }}-${{ matrix.job.target }}.tar.gz
+          asset_content_type: application/octet-stream
+
+ 
