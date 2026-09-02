@@ -14,7 +14,7 @@ categories = ["command-line-utilities", "filesystem"]
 [dependencies]
 clap = { version = "4.5", features = ["derive", "env"] }
 regex = "1.11"
-anyhow = "1.0"
+anyhow = "1.0.103"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 human-panic = "2.0.8"
