@@ -14,32 +14,25 @@ permissions:
 jobs:
   release:
     name: Create release
-    permissions: write-all
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
-    outputs:
-      release_upload_url: ${{ steps.create_release.outputs.upload_url }}
-      release_version: ${{ steps.get_version.outputs.version }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Get release version
-        id: get_version
-        uses: battila7/get-version-action@v2
-
-      - name: Create release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Create draft release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.get_version.outputs.version }}
-          release_name: Release ${{ steps.get_version.outputs.version }}
-          draft: true
-          prerelease: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --draft \
+            --title "Release ${GITHUB_REF_NAME}" \
+            --verify-tag
 
   build-unix:
     name: Build ${{ matrix.job.os }} (${{ matrix.job.target }})
-    permissions: write-all
+    permissions:
+      contents: write
     runs-on: ${{ matrix.job.os }}
     needs: release
     strategy:
@@ -81,33 +74,40 @@ jobs:
       - name: Build
         shell: bash
         run: |
+          set -euo pipefail
           if [[ "${{ matrix.job.use-cross }}" == "true" ]]; then
-            cross build --release --locked --target ${{ matrix.job.target }}
+            cross build --release --locked --target "${{ matrix.job.target }}"
           else
-            cargo build --release --locked --target ${{ matrix.job.target }}
+            cargo build --release --locked --target "${{ matrix.job.target }}"
           fi
-          
+
       - name: Verify release binary
         shell: bash
         run: |
           set -euo pipefail
-          test -f "target/${{ matrix.job.target }}/release/ruslink"
-          test -x "target/${{ matrix.job.target }}/release/ruslink"
+          binary="target/${{ matrix.job.target }}/release/ruslink"
+          test -f "$binary"
+          test -x "$binary"
 
       - name: Strip debug information
-        run: strip target/${{ matrix.job.target }}/release/ruslink
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary="target/${{ matrix.job.target }}/release/ruslink"
+          strip "$binary"
 
       - name: Archive
-        run: tar czf ruslink-${{ needs.release.outputs.release_version }}-${{ matrix.job.target }}.tar.gz -C target/${{ matrix.job.target }}/release ruslink
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="ruslink-${GITHUB_REF_NAME}-${{ matrix.job.target }}.tar.gz"
+          tar czf "$archive" -C "target/${{ matrix.job.target }}/release" ruslink
 
-      - name: Upload release
-        uses: actions/upload-release-asset@v1
+      - name: Upload release asset
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.release.outputs.release_upload_url }}
-          asset_path: ruslink-${{ needs.release.outputs.release_version }}-${{ matrix.job.target }}.tar.gz
-          asset_name: ruslink-${{ needs.release.outputs.release_version }}-${{ matrix.job.target }}.tar.gz
-          asset_content_type: application/octet-stream
-
- 
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="ruslink-${GITHUB_REF_NAME}-${{ matrix.job.target }}.tar.gz"
+          gh release upload "${GITHUB_REF_NAME}" "$archive" --clobber
