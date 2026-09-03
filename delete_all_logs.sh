@@ -1,4 +1,26 @@
 #!/bin/bash
+#
+# Acessar a página de tokens clássicos
+# Vá para: https://github.com/settings/tokens
+#
+# NÃO clique em "Generate new token (fine-grained)"
+#
+# Clique em "Generate new token (classic)" (no final da página)
+#
+# Note: delete-runs
+# Expiration: No expiration (ou 90 dias)
+#
+# Selecione os escopos:
+# ☑️ repo (TUDO - vai marcar todos automaticamente)
+#    ☑️ repo:status
+#    ☑️ repo_deployment  
+#    ☑️ public_repo
+#    ☑️ repo:invite
+#    ☑️ security_events
+# ☑️ workflow  <-- ESSENCIAL!
+# ☑️ admin:repo_hook
+# ☑️ delete_repo (opcional)
+#
 
 # Função para detectar repositório do .git
 detect_repo() {
