@@ -88,13 +88,18 @@ if [ -n "$1" ]; then
 elif [ -n "$GITHUB_TOKEN" ]; then
     TOKEN="$GITHUB_TOKEN"
 else
-    echo "🔑 Enter your GitHub Token (Classic):"
-    echo "   (Create one at: https://github.com/settings/tokens)"
+    echo "❌ Error: No token provided!"
+    echo ""
+    echo "Usage:"
+    echo "  $0 YOUR_TOKEN"
+    echo ""
+    echo "Or export it as an environment variable first:"
+    echo "  export GITHUB_TOKEN=YOUR_TOKEN"
+    echo "  $0"
+    echo ""
+    echo "🔑 Create a Classic token at: https://github.com/settings/tokens"
     echo "   Required scopes: repo, workflow"
-    echo ""
-    read -s -p "Token: " TOKEN
-    echo ""
-    echo ""
+    exit 1
 fi
 
 if [ -z "$TOKEN" ]; then
