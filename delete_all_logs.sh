@@ -1,52 +1,52 @@
 #!/bin/bash
 #
-# Acessar a página de tokens clássicos
-# Vá para: https://github.com/settings/tokens
+# Go to the classic tokens page
+# Go to: https://github.com/settings/tokens
 #
-# NÃO clique em "Generate new token (fine-grained)"
+# Do NOT click "Generate new token (fine-grained)"
 #
-# Clique em "Generate new token (classic)" (no final da página)
+# Click "Generate new token (classic)" (at the bottom of the page)
 #
 # Note: delete-runs
-# Expiration: No expiration (ou 90 dias)
+# Expiration: No expiration (or 90 days)
 #
-# Selecione os escopos:
-# ☑️ repo (TUDO - vai marcar todos automaticamente)
+# Select the scopes:
+# ☑️ repo (ALL - it will check all of them automatically)
 #    ☑️ repo:status
 #    ☑️ repo_deployment  
 #    ☑️ public_repo
 #    ☑️ repo:invite
 #    ☑️ security_events
-# ☑️ workflow  <-- ESSENCIAL!
+# ☑️ workflow  <-- ESSENTIAL!
 # ☑️ admin:repo_hook
-# ☑️ delete_repo (opcional)
+# ☑️ delete_repo (optional)
 #
 
-# Função para detectar repositório do .git
+# Function to detect the repository from .git
 detect_repo() {
-    # Verifica se está em um repositório git
+    # Check if we're inside a git repository
     if ! git rev-parse --git-dir > /dev/null 2>&1; then
-        echo "❌ Erro: Você não está em um repositório git."
-        echo "Execute este script dentro de um repositório git."
+        echo "❌ Error: You are not inside a git repository."
+        echo "Run this script inside a git repository."
         exit 1
     fi
     
-    # Pega a URL do remote
+    # Get the remote URL
     local url=$(git config --get remote.origin.url 2>/dev/null)
     
-    # Se não tiver origin, tenta o primeiro remote
+    # If there's no origin, try the first remote
     if [ -z "$url" ]; then
         local first_remote=$(git remote 2>/dev/null | head -n1)
         if [ -n "$first_remote" ]; then
             url=$(git config --get "remote.$first_remote.url")
         else
-            echo "❌ Erro: Nenhum remote configurado neste repositório."
-            echo "Configure um remote com: git remote add origin <url>"
+            echo "❌ Error: No remote configured in this repository."
+            echo "Configure a remote with: git remote add origin <url>"
             exit 1
         fi
     fi
     
-    # Extrai usuario/repositorio
+    # Extract user/repository
     local repo=""
     if [[ "$url" =~ git@[^:]+:(.+).git$ ]]; then
         repo="${BASH_REMATCH[1]}"
@@ -65,32 +65,32 @@ detect_repo() {
     repo=$(echo "$repo" | sed 's/\/$//')
     
     if [ -z "$repo" ]; then
-        echo "❌ Erro: Não foi possível extrair o nome do repositório da URL: $url"
+        echo "❌ Error: Could not extract the repository name from the URL: $url"
         exit 1
     fi
     
     echo "$repo"
 }
 
-# Detecta o repositório atual
+# Detect the current repository
 REPO=$(detect_repo)
 
 echo "╔═══════════════════════════════════════════════════════════╗"
-echo "║     🔥 DELETADOR MASSIVO DE RUNS                        ║"
+echo "║     🔥 MASS RUN DELETER                                  ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo ""
-echo "📁 Repositório: $REPO"
+echo "📁 Repository: $REPO"
 echo ""
 
-# Verifica se o token foi informado como argumento ou variável de ambiente
+# Check if the token was provided as an argument or environment variable
 if [ -n "$1" ]; then
     TOKEN="$1"
 elif [ -n "$GITHUB_TOKEN" ]; then
     TOKEN="$GITHUB_TOKEN"
 else
-    echo "🔑 Informe seu GitHub Token (Classic):"
-    echo "   (Crie em: https://github.com/settings/tokens)"
-    echo "   Escopos necessários: repo, workflow"
+    echo "🔑 Enter your GitHub Token (Classic):"
+    echo "   (Create one at: https://github.com/settings/tokens)"
+    echo "   Required scopes: repo, workflow"
     echo ""
     read -s -p "Token: " TOKEN
     echo ""
@@ -98,40 +98,40 @@ else
 fi
 
 if [ -z "$TOKEN" ]; then
-    echo "❌ Token não informado!"
+    echo "❌ Token not provided!"
     exit 1
 fi
 
-# Testa o token
-echo "🔍 Testando token..."
+# Test the token
+echo "🔍 Testing token..."
 RESPONSE=$(curl -s -H "Authorization: token $TOKEN" \
     "https://api.github.com/repos/$REPO" 2>/dev/null)
 
 if echo "$RESPONSE" | grep -q "Bad credentials"; then
-    echo "❌ Token inválido! Certifique-se de que é um token CLASSIC."
-    echo "   Escopos necessários: repo, workflow"
+    echo "❌ Invalid token! Make sure it is a CLASSIC token."
+    echo "   Required scopes: repo, workflow"
     exit 1
 fi
 
-echo "✅ Token válido!"
+echo "✅ Valid token!"
 echo ""
 
-# Busca TODOS os runs
-echo "🔍 Buscando todos os runs..."
+# Fetch ALL runs
+echo "🔍 Fetching all runs..."
 echo ""
 
 PAGE=1
 ALL_IDS=()
 
 while true; do
-    echo "  📄 Buscando página $PAGE..."
+    echo "  📄 Fetching page $PAGE..."
     
     RESPONSE=$(curl -s -H "Authorization: token $TOKEN" \
         "https://api.github.com/repos/$REPO/actions/runs?per_page=100&page=$PAGE" 2>/dev/null)
     
-    # Verifica se a resposta é válida
+    # Check if the response is valid
     if echo "$RESPONSE" | grep -q "API rate limit"; then
-        echo "  ⏳ Rate limit atingido. Aguardando 60 segundos..."
+        echo "  ⏳ Rate limit reached. Waiting 60 seconds..."
         sleep 60
         continue
     fi
@@ -150,9 +150,9 @@ while true; do
         fi
     done <<< "$IDS"
     
-    echo "  ✅ Encontrados $COUNT runs nesta página"
+    echo "  ✅ Found $COUNT runs on this page"
     
-    # Verifica se tem mais páginas
+    # Check if there are more pages
     TOTAL_COUNT=$(echo "$RESPONSE" | jq -r '.total_count' 2>/dev/null)
     if [ -n "$TOTAL_COUNT" ] && [ ${#ALL_IDS[@]} -ge "$TOTAL_COUNT" ]; then
         break
@@ -160,7 +160,7 @@ while true; do
     
     PAGE=$((PAGE + 1))
     
-    # Limite de segurança (evita loop infinito)
+    # Safety limit (avoids infinite loop)
     if [ $PAGE -gt 50 ]; then
         break
     fi
@@ -169,15 +169,15 @@ done
 TOTAL=${#ALL_IDS[@]}
 
 echo ""
-echo "📊 TOTAL encontrados: $TOTAL runs"
+echo "📊 TOTAL found: $TOTAL runs"
 echo ""
 
 if [ "$TOTAL" -eq 0 ]; then
-    echo "✅ Nenhum run encontrado!"
+    echo "✅ No runs found!"
     exit 0
 fi
 
-echo "📋 Primeiros 5 runs:"
+echo "📋 First 5 runs:"
 for i in {0..4}; do
     if [ $i -lt $TOTAL ]; then
         echo "  Run ${ALL_IDS[$i]}"
@@ -185,15 +185,15 @@ for i in {0..4}; do
 done
 echo ""
 
-read -p "⚠️  Deletar TODOS os $TOTAL runs? (digite 'SIM' para confirmar): " CONFIRMACAO
+read -p "⚠️  Delete ALL $TOTAL runs? (type 'YES' to confirm): " CONFIRMACAO
 
-if [ "$CONFIRMACAO" != "SIM" ]; then
-    echo "❌ Cancelado."
+if [ "$CONFIRMACAO" != "YES" ]; then
+    echo "❌ Cancelled."
     exit 0
 fi
 
 echo ""
-echo "🚀 Deletando em lotes de 20..."
+echo "🚀 Deleting in batches of 20..."
 echo ""
 
 SUCESSOS=0
@@ -205,7 +205,7 @@ for id in "${ALL_IDS[@]}"; do
     CONTADOR=$((CONTADOR + 1))
     PERCENT=$((CONTADOR * 100 / TOTAL))
     
-    echo -n "[$PERCENT%] $CONTADOR/$TOTAL - Deletando $id ... "
+    echo -n "[$PERCENT%] $CONTADOR/$TOTAL - Deleting $id ... "
     
     STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
         -H "Authorization: token $TOKEN" \
@@ -215,44 +215,44 @@ for id in "${ALL_IDS[@]}"; do
         echo "✅"
         SUCESSOS=$((SUCESSOS + 1))
     elif [ "$STATUS" = "404" ]; then
-        echo "⏭️  (já deletado)"
+        echo "⏭️  (already deleted)"
         JA_DELETADOS=$((JA_DELETADOS + 1))
     else
         echo "❌ (HTTP $STATUS)"
         FALHAS=$((FALHAS + 1))
     fi
     
-    # Pausa para não sobrecarregar
+    # Pause to avoid overloading
     sleep 0.05
 done
 
 echo ""
 echo "╔═══════════════════════════════════════════════════════════╗"
-echo "║                     📊 RESUMO FINAL                      ║"
+echo "║                     📊 FINAL SUMMARY                     ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo ""
-echo "  ✅ Deletados com sucesso: $SUCESSOS"
+echo "  ✅ Successfully deleted: $SUCESSOS"
 if [ $JA_DELETADOS -gt 0 ]; then
-    echo "  ⏭️  Já estavam deletados: $JA_DELETADOS"
+    echo "  ⏭️  Already deleted: $JA_DELETADOS"
 fi
 if [ $FALHAS -gt 0 ]; then
-    echo "  ❌ Falhas: $FALHAS"
+    echo "  ❌ Failures: $FALHAS"
 fi
 echo ""
 
-# Verifica se ainda há runs
-echo "🔍 Verificando runs restantes..."
+# Check if there are still remaining runs
+echo "🔍 Checking remaining runs..."
 REMAINING=$(curl -s -H "Authorization: token $TOKEN" \
     "https://api.github.com/repos/$REPO/actions/runs?per_page=1" 2>/dev/null | \
     jq -r '.total_count' 2>/dev/null)
 
 if [ -n "$REMAINING" ] && [ "$REMAINING" -gt 0 ]; then
-    echo "⚠️  Ainda há $REMAINING runs (pode ser cache do GitHub)"
-    echo "   Aguarde 1 minuto e execute novamente"
+    echo "⚠️  There are still $REMAINING runs (might be GitHub cache)"
+    echo "   Wait 1 minute and run again"
 else
-    echo "🎉 MISSÃO CUMPRIDA! Todos os runs foram deletados!"
+    echo "🎉 MISSION ACCOMPLISHED! All runs have been deleted!"
 fi
 
 echo ""
-echo "💡 Dica: Para usar em outros repositórios, execute dentro da pasta do projeto"
-echo "   Ou passe o token como argumento: $0 SEU_TOKEN"
+echo "💡 Tip: To use in other repositories, run inside the project folder"
+echo "   Or pass the token as an argument: $0 YOUR_TOKEN"
