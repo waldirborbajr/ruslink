@@ -6,9 +6,6 @@ on:
 
 env:
   RUST_BACKTRACE: full
-  # sccache: cache de disco local, restaurado via actions/cache
-  SCCACHE_CACHE_SIZE: "5G"
-  SCCACHE_DIR: ${{ github.workspace }}/.sccache
 
 permissions:
   packages: write
@@ -39,26 +36,30 @@ jobs:
     runs-on: ${{ matrix.job.os }}
     needs: release
     env:
-      # Vazio nos targets que usam cross (o build roda dentro de um container
-      # Docker, onde o sccache do host não existe). Cargo trata "" como não definido.
-      RUSTC_WRAPPER: ${{ !matrix.job.use-cross && 'sccache' || '' }}
+      BIN: ruslink
+      ARCHIVE: ruslink-${{ github.ref_name }}-${{ matrix.job.target }}.tar.gz
     strategy:
       fail-fast: false
       matrix:
         job:
-          - { os: ubuntu-latest, target: i686-unknown-linux-gnu, use-cross: true, }
-          - { os: ubuntu-latest, target: i686-unknown-linux-musl,use-cross: true, }
-          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, use-cross: true, }
+          - { os: ubuntu-latest, target: i686-unknown-linux-gnu, use-cross: true }
+          - { os: ubuntu-latest, target: i686-unknown-linux-musl, use-cross: true }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, use-cross: true }
           - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
           - { os: macos-latest, target: x86_64-apple-darwin }
           - { os: macos-latest, target: aarch64-apple-darwin }
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      # Mesmo sccache-key do job "build" do CI: em tags, o cache da branch
+      # padrão é restaurado via restore-keys. Targets com cross rodam em
+      # container Docker, onde o sccache do host não existe.
+      - uses: ./.github/actions/setup-rust
         with:
           targets: ${{ matrix.job.target }}
+          sccache: ${{ !matrix.job.use-cross }}
+          sccache-key: ${{ matrix.job.target }}
+          rust-cache: "false"
 
       - name: Install cross
         if: matrix.job.use-cross
@@ -66,64 +67,31 @@ jobs:
         with:
           tool: cross
 
-      - name: Install sccache
-        if: ${{ !matrix.job.use-cross }}
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      # Mesmo prefixo de chave do job "build" do CI: em tags, o cache da branch
-      # padrão é restaurado via restore-keys (caches criados em tags não são
-      # reaproveitados por tags futuras).
-      - name: Cache sccache
-        if: ${{ !matrix.job.use-cross }}
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.SCCACHE_DIR }}
-          key: sccache-${{ matrix.job.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            sccache-${{ matrix.job.target }}-
-
       - name: Build
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ matrix.job.use-cross }}" == "true" ]]; then
-            cross build --release --locked --target "${{ matrix.job.target }}"
-          else
-            cargo build --release --locked --target "${{ matrix.job.target }}"
-          fi
+          tool=cargo
+          [[ "${{ matrix.job.use-cross }}" == "true" ]] && tool=cross
+          "$tool" build --release --locked --target "${{ matrix.job.target }}"
 
       - name: sccache stats
-        if: ${{ always() && !matrix.job.use-cross }}
+        if: always() && env.RUSTC_WRAPPER == 'sccache'
         shell: bash
         run: sccache --show-stats
 
-      - name: Verify release binary
+      - name: Verify, strip and archive
         shell: bash
         run: |
           set -euo pipefail
-          binary="target/${{ matrix.job.target }}/release/ruslink"
-          test -f "$binary"
-          test -x "$binary"
-
-      - name: Strip debug information
-        shell: bash
-        run: |
-          set -euo pipefail
-          binary="target/${{ matrix.job.target }}/release/ruslink"
-          strip "$binary"
-
-      - name: Archive
-        shell: bash
-        run: |
-          set -euo pipefail
-          archive="ruslink-${GITHUB_REF_NAME}-${{ matrix.job.target }}.tar.gz"
-          tar czf "$archive" -C "target/${{ matrix.job.target }}/release" ruslink
+          dir="target/${{ matrix.job.target }}/release"
+          test -f "$dir/$BIN"
+          test -x "$dir/$BIN"
+          strip "$dir/$BIN"
+          tar czf "$ARCHIVE" -C "$dir" "$BIN"
 
       - name: Upload release asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
-        run: |
-          set -euo pipefail
-          archive="ruslink-${GITHUB_REF_NAME}-${{ matrix.job.target }}.tar.gz"
-          gh release upload "${GITHUB_REF_NAME}" "$archive" --clobber
+        run: gh release upload "${GITHUB_REF_NAME}" "$ARCHIVE" --clobber
