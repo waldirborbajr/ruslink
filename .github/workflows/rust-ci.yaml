@@ -3,21 +3,17 @@ name: Rust CI
 on:
   push:
     branches: [main, master]
-    paths:
+    paths: &paths
       - "**/*.rs"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/**"
+      - ".github/actions/**"
       - "justfile"
 
   pull_request:
     branches: [main, master]
-    paths:
-      - "**/*.rs"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".github/workflows/**"
-      - "justfile"
+    paths: *paths
 
 permissions:
   contents: read
@@ -26,41 +22,18 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: 1
-  # sccache: cache de disco local, restaurado via actions/cache
-  SCCACHE_CACHE_SIZE: "5G"
-  SCCACHE_DIR: ${{ github.workspace }}/.sccache
 
 jobs:
   check:
     name: Check / Fmt / Clippy
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      RUSTC_WRAPPER: sccache
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-rust
         with:
           components: rustfmt, clippy
-
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Cache sccache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.SCCACHE_DIR }}
-          key: sccache-${{ runner.os }}-check-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            sccache-${{ runner.os }}-check-
-            sccache-${{ runner.os }}-
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
+          sccache-key: check
           shared-key: stable-linux
 
       - name: Format check
@@ -70,93 +43,52 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: sccache stats
-        if: always()
+        if: always() && env.RUSTC_WRAPPER == 'sccache'
+        shell: bash
         run: sccache --show-stats
 
   test:
     name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
-    env:
-      RUSTC_WRAPPER: sccache
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Cache sccache
-        uses: actions/cache@v4
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-rust
         with:
-          path: ${{ env.SCCACHE_DIR }}
-          key: sccache-${{ runner.os }}-test-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            sccache-${{ runner.os }}-test-
-            sccache-${{ runner.os }}-
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+          sccache-key: test
 
       - name: Run tests
         run: cargo test --all-features -- --nocapture
 
       - name: sccache stats
-        if: always()
+        if: always() && env.RUSTC_WRAPPER == 'sccache'
+        shell: bash
         run: sccache --show-stats
 
   build:
     name: Build (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    env:
-      RUSTC_WRAPPER: sccache
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-          - os: macos-latest
-            target: x86_64-apple-darwin
-          - os: macos-latest
-            target: aarch64-apple-darwin
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl }
+          - { os: macos-latest, target: x86_64-apple-darwin }
+          - { os: macos-latest, target: aarch64-apple-darwin }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc }
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-rust
         with:
           targets: ${{ matrix.target }}
-
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Cache sccache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.SCCACHE_DIR }}
-          key: sccache-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            sccache-${{ matrix.target }}-
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.target }}
+          sccache-key: ${{ matrix.target }}
+          cache-key: ${{ matrix.target }}
 
       # Required for musl builds
       - name: Install musl tools
@@ -170,25 +102,20 @@ jobs:
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.target == 'x86_64-unknown-linux-musl' && 'x86_64-linux-gnu-gcc' || '' }}
 
       - name: sccache stats
-        if: always()
+        if: always() && env.RUSTC_WRAPPER == 'sccache'
+        shell: bash
         run: sccache --show-stats
 
   # ==================== Security Audit ====================
-  # Sem sccache: este job quase não compila código do projeto.
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-rust
         with:
+          sccache: "false"
           shared-key: security-audit
 
       - name: Install cargo-audit
@@ -206,22 +133,16 @@ jobs:
           command: check
           arguments: --all-features
 
-  # Sem sccache: o tarpaulin instrumenta o código com flags próprias e
-  # o wrapper tende a gerar cache miss / interferência.
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: test
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-rust
+        with:
+          sccache: "false" # tarpaulin instrumenta o código; o wrapper atrapalha
 
       - name: Install cargo-tarpaulin
         uses: taiki-e/install-action@v2
@@ -247,29 +168,11 @@ jobs:
     name: Documentation
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      RUSTC_WRAPPER: sccache
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Cache sccache
-        uses: actions/cache@v4
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-rust
         with:
-          path: ${{ env.SCCACHE_DIR }}
-          key: sccache-${{ runner.os }}-docs-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            sccache-${{ runner.os }}-docs-
-            sccache-${{ runner.os }}-
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+          sccache-key: docs
 
       - name: Check documentation
         env:
@@ -277,5 +180,6 @@ jobs:
         run: cargo doc --all-features --no-deps --document-private-items
 
       - name: sccache stats
-        if: always()
+        if: always() && env.RUSTC_WRAPPER == 'sccache'
+        shell: bash
         run: sccache --show-stats
