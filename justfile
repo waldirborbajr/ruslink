@@ -7,6 +7,9 @@
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 set dotenv-load := true
 
+# Extracts version from Cargo.toml
+version := `grep "^version" Cargo.toml | awk -F'"' '{print $2}' | head -n1`
+
 # Default recipe
 default: help
 
@@ -26,14 +29,21 @@ help:
     @echo " just build-release        → Release build (default features)"
     @echo " just build-release-minimal→ Smallest possible binary"
     @echo ""
-    @echo "=== Quality ==="
+    @echo "=== Quality (quick, single crate) ==="
     @echo " just fmt                  → Format code"
     @echo " just fmt-check            → Check formatting"
     @echo " just lint                 → fmt-check + clippy"
     @echo " just clippy               → Run clippy (warnings denied)"
     @echo " just clippy-fix           → Auto-fix clippy suggestions"
     @echo " just test                 → Run tests"
-    @echo " just check                → Cargo check"
+    @echo " just cargo-check          → Cargo check (all targets/features)"
+    @echo ""
+    @echo "=== Full Check (workspace, CI-like) ==="
+    @echo " just check                → format + clippy + test + doc"
+    @echo " just check-format         → Check formatting (workspace)"
+    @echo " just check-clippy         → Clippy, warnings denied (workspace)"
+    @echo " just check-test           → Tests + feature powerset"
+    @echo " just check-doc            → Docs, warnings denied"
     @echo ""
     @echo "=== Maintenance ==="
     @echo " just update               → Update dependencies + Cargo.lock"
@@ -76,14 +86,14 @@ build-release:
 build-release-minimal:
     cargo build --release --no-default-features --features minimal
 
-# ─── Quality ───────────────────────────────────────────────────
+# ─── Quality (quick, single crate) ─────────────────────────────
 fmt:
     cargo fmt --all
 
 fmt-check:
     cargo fmt --all -- --check
 
-check:
+cargo-check:
     cargo check --all-targets --all-features
 
 test:
@@ -96,6 +106,22 @@ clippy-fix:
     cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features
 
 lint: fmt-check clippy
+
+# ─── Full Check (workspace, CI-like) ───────────────────────────
+check: check-format check-clippy check-test check-doc
+
+check-format:
+    cargo fmt --all -- --check
+
+check-clippy:
+    cargo clippy --workspace --exclude ya-gpt-cuda --all-targets -- -D warnings
+
+check-test:
+    cargo test --workspace --exclude ya-gpt-cuda
+    cargo hack -p ya-gpt test --feature-powerset
+
+check-doc:
+    RUSTDOCFLAGS="-D warnings" cargo doc --workspace --exclude ya-gpt-cuda --no-deps
 
 # ─── Maintenance ───────────────────────────────────────────────
 update:
@@ -124,7 +150,7 @@ clean:
 cache:
     cargo-cache --remove-dir all || echo "cargo-cache not installed (optional)"
 
-# ─── Release Artifacts Cleanup (local only) ────────────────────
+# Remove local release artifacts only
 clean-release-artifacts:
     @echo "🧹 Cleaning local release artifacts..."
     rm -rf target/release/ruslink target/release/ruslink.exe 2>/dev/null || true
@@ -132,53 +158,50 @@ clean-release-artifacts:
     @echo "→ Local artifacts removed"
 
 # ─── Release ───────────────────────────────────────────────────
-# Extracts version from Cargo.toml
-version := `grep "^version" Cargo.toml | awk -F'"' '{print $2}' | head -n1`
-
 release-dry-run:
     @echo "Current version in Cargo.toml → {{version}}"
     @echo "Tag that will be created → v{{version}}"
     @echo ""
     @echo "This will trigger the GitHub Actions workflow to build official binaries."
 
-# Deletes the GitHub Release and tag (both remote and local) for the current version
-# Only affects the version defined in Cargo.toml — safe for old versions
+# Deletes the GitHub Release and tag (remote and local) for the current version.
+# Only affects the version defined in Cargo.toml — safe for old versions.
 release-clean:
     @echo "🧹 Preparing fresh release for v{{version}}..."
     just clean-release-artifacts
-    
+
     @echo "→ Deleting remote GitHub Release and tag (v{{version}})..."
     gh release delete "v{{version}}" --yes --cleanup-tag 2>/dev/null \
         && echo "   → Remote release + tag deleted" \
         || echo "   → No previous remote release found"
-    
+
     @echo "→ Deleting local tag (v{{version}})..."
     git tag -d "v{{version}}" 2>/dev/null \
         && echo "   → Local tag deleted" \
         || echo "   → No local tag found"
-    
+
     @echo "→ Fetching latest tags from remote..."
     git fetch --tags --force
-    
+
     @echo ""
     @echo "🚀 Starting clean release..."
     just release
 
 release:
     @echo "=== Preparing release v{{version}} ==="
-   
+
     just pre-commit
-    
+
     @echo "Committing Cargo.lock (if changed)..."
     git add Cargo.lock
     git commit -m "chore: update Cargo.lock for v{{version}}" || echo "→ No changes to Cargo.lock"
-    
+
     @echo "Creating annotated tag v{{version}}..."
     git tag -a "v{{version}}" -m "Release v{{version}}"
-    
+
     @echo "Pushing commit and tag to GitHub..."
     git push origin main --follow-tags
-    
+
     @echo ""
     @echo "🎉 Tag v{{version}} pushed successfully!"
     @echo "→ GitHub Actions is now building the official binaries and creating the release."
